@@ -1,0 +1,208 @@
+---
+title: 'Health Endpoint'
+description: 'Check XW server health and availability'
+---
+
+## GET /api/health
+
+Returns the health status of the XW API server. This endpoint provides a simple way to verify that the server is running and able to respond to requests.
+
+### Use Cases
+
+- Load balancer health probes
+- Monitoring systems (Prometheus, Datadog)
+- Kubernetes liveness/readiness probes
+- Manual server status checks
+- CI/CD health verification
+
+### Request
+
+```bash
+curl http://localhost:11581/api/health
+```
+
+### Response
+
+<ResponseField name="status" type="string" required>
+  Health status indicator. Always `"healthy"` when server is operational.
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Human-readable status message. Typically `"Server is running"`.
+</ResponseField>
+
+### Response Example
+
+```json
+{
+  "status": "healthy",
+  "message": "Server is running"
+}
+```
+
+### Status Codes
+
+<ResponseField name="200" type="OK">
+  Server is healthy and operational
+</ResponseField>
+
+<ResponseField name="405" type="Method Not Allowed">
+  Invalid HTTP method used (only GET is supported)
+</ResponseField>
+
+### Implementation Notes
+
+The health check is intentionally lightweight:
+
+- Does not validate subsystem health (Docker, models, devices)
+- Does not check disk space or resource availability
+- Returns immediately without expensive operations
+- Suitable for high-frequency polling
+
+For detailed diagnostics, use `/api/version` or `/api/config/info` instead.
+
+## Example Usage
+
+### Basic Health Check
+
+```bash
+curl http://localhost:11581/api/health
+```
+
+### With Status Code Check
+
+```bash
+curl -f http://localhost:11581/api/health || echo "Server is down"
+```
+
+### In Docker Health Check
+
+```dockerfile
+HEALTHCHECK --interval=30s --timeout=3s \
+  CMD curl -f http://localhost:11581/api/health || exit 1
+```
+
+### In Kubernetes Probe
+
+```yaml
+livenessProbe:
+  httpGet:
+    path: /api/health
+    port: 11581
+  initialDelaySeconds: 10
+  periodSeconds: 30
+
+readinessProbe:
+  httpGet:
+    path: /api/health
+    port: 11581
+  initialDelaySeconds: 5
+  periodSeconds: 10
+```
+
+### Python Example
+
+```python
+import requests
+
+try:
+    response = requests.get("http://localhost:11581/api/health", timeout=5)
+    if response.status_code == 200:
+        print("Server is healthy")
+        print(response.json())
+    else:
+        print(f"Server returned status {response.status_code}")
+except requests.exceptions.RequestException as e:
+    print(f"Server is unreachable: {e}")
+```
+
+### Go Example
+
+```go
+package main
+
+import (
+    "encoding/json"
+    "fmt"
+    "net/http"
+    "time"
+)
+
+type HealthResponse struct {
+    Status  string `json:"status"`
+    Message string `json:"message"`
+}
+
+func main() {
+    client := &http.Client{Timeout: 5 * time.Second}
+    resp, err := client.Get("http://localhost:11581/api/health")
+    if err != nil {
+        fmt.Printf("Server is unreachable: %v\n", err)
+        return
+    }
+    defer resp.Body.Close()
+
+    var health HealthResponse
+    if err := json.NewDecoder(resp.Body).Decode(&health); err != nil {
+        fmt.Printf("Failed to parse response: %v\n", err)
+        return
+    }
+
+    fmt.Printf("Status: %s\nMessage: %s\n", health.Status, health.Message)
+}
+```
+
+## Monitoring Integration
+
+### Prometheus
+
+Create a simple exporter:
+
+```python
+from prometheus_client import start_http_server, Gauge
+import requests
+import time
+
+health_status = Gauge('xw_server_health', 'XW Server Health Status (1=healthy, 0=unhealthy)')
+
+def check_health():
+    try:
+        response = requests.get('http://localhost:11581/api/health', timeout=5)
+        return 1 if response.status_code == 200 else 0
+    except:
+        return 0
+
+if __name__ == '__main__':
+    start_http_server(8000)
+    while True:
+        health_status.set(check_health())
+        time.sleep(15)
+```
+
+### Nagios/Icinga
+
+```bash
+#!/bin/bash
+# check_xw_health.sh
+
+RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:11581/api/health)
+
+if [ "$RESPONSE" = "200" ]; then
+    echo "OK - XW server is healthy"
+    exit 0
+else
+    echo "CRITICAL - XW server is not responding (HTTP $RESPONSE)"
+    exit 2
+fi
+```
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card title="Models API" icon="cube" href="/api/endpoints/models">
+    List and manage available models
+  </Card>
+  <Card title="Config Info" icon="gear" href="/api/endpoints/config">
+    View current server configuration
+  </Card>
+</CardGroup>

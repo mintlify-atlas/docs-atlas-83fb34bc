@@ -1,0 +1,614 @@
+---
+title: Model Configuration
+description: Configure AI models, device compatibility, and inference engine mappings
+---
+
+The model configuration file (`models.yaml`) defines the catalog of AI models that can be deployed using XW CLI, along with their hardware compatibility and supported inference engines.
+
+## Configuration Structure
+
+```yaml
+version: "1.0"
+
+models:
+  - model_id: qwen2.5-7b-instruct
+    source_id: Qwen/Qwen2.5-7B-Instruct
+    parameters: 7.6
+    context_length: 131072
+    supported_devices:
+      ascend-910b:
+        - vllm:docker
+        - mindie:docker
+    capabilities:
+      - completion
+```
+
+## Model Definition
+
+### Basic Fields
+
+<AccordionGroup>
+  <Accordion title="model_id (required)">
+    **Type**: String  
+    **Description**: Unique identifier for this model in XW CLI
+    
+    **Format**: Lowercase, hyphen-separated  
+    **Convention**: `{family}-{size}[-{variant}]`
+    
+    ```yaml
+    model_id: qwen2.5-7b-instruct
+    ```
+    
+    Examples:
+    - `qwen2.5-7b-instruct`
+    - `qwen3-32b-w8a8`
+    - `glm-4.5-w8a8`
+    - `deepseek-r1-distill-qwen-7b`
+    
+    <Warning>Must be globally unique across all models</Warning>
+  </Accordion>
+
+  <Accordion title="source_id (required)">
+    **Type**: String  
+    **Description**: Model identifier on the source platform
+    
+    Used for model downloading and registry lookups.
+    
+    **Platforms**:
+    - ModelScope: `{org}/{model}` (e.g., `qwen/Qwen2.5-7B-Instruct`)
+    - HuggingFace: `{org}/{model}` (e.g., `Qwen/Qwen2.5-7B-Instruct`)
+    - Custom registry: Full model path
+    
+    ```yaml
+    source_id: Qwen/Qwen2.5-7B-Instruct
+    ```
+  </Accordion>
+
+  <Accordion title="parameters (optional)">
+    **Type**: Float  
+    **Unit**: Billions of parameters
+    
+    **Description**: Model size in billions of parameters
+    
+    Used for resource estimation and display.
+    
+    ```yaml
+    parameters: 7.6  # 7.6B parameters
+    ```
+    
+    Examples:
+    - `7.0` for 7B models
+    - `32.0` for 32B models
+    - `235.0` for 235B models
+  </Accordion>
+
+  <Accordion title="context_length (optional)">
+    **Type**: Integer  
+    **Unit**: Tokens
+    
+    **Description**: Maximum context window size
+    
+    Used for validation and resource planning.
+    
+    ```yaml
+    context_length: 131072  # 128K tokens
+    ```
+    
+    Common values:
+    - `32768` - 32K tokens
+    - `131072` - 128K tokens
+    - `262144` - 256K tokens
+  </Accordion>
+</AccordionGroup>
+
+### Device Compatibility
+
+<AccordionGroup>
+  <Accordion title="supported_devices (required)">
+    **Type**: Map  
+    **Description**: Hardware compatibility and engine priority
+    
+    **Structure**: `device_config_key` → `[engines]`
+    
+    Maps device types (from `devices.yaml`) to prioritized lists of inference engines.
+    
+    ```yaml
+    supported_devices:
+      ascend-910b:
+        - vllm:docker
+        - mindie:docker
+      ascend-310p:
+        - vllm:docker
+        - mindie:docker
+        - mlguider:docker
+      metax-c550:
+        - vllm:docker
+    ```
+    
+    **Engine Priority**: Engines are listed in priority order. The system tries engines from first to last until one succeeds.
+    
+    <Info>
+      The `config_key` values must match entries in `devices.yaml`
+    </Info>
+  </Accordion>
+
+  <Accordion title="Engine Format">
+    **Format**: `{backend}:{mode}`
+    
+    **Backend**: Inference engine name
+    - `vllm` - vLLM inference engine
+    - `mindie` - MindIE inference engine
+    - `mlguider` - MLGuider inference engine
+    - `omni-infer` - Omni-Infer engine
+    
+    **Mode**: Deployment mode
+    - `docker` - Containerized deployment (recommended)
+    - `native` - Native process deployment
+    
+    ```yaml
+    - vllm:docker    # vLLM in Docker container
+    - mindie:docker  # MindIE in Docker container
+    - mlguider:docker # MLGuider in Docker container
+    ```
+    
+    <Warning>Engine must have a corresponding runtime image defined in `devices.yaml`</Warning>
+  </Accordion>
+</AccordionGroup>
+
+### Model Metadata
+
+<AccordionGroup>
+  <Accordion title="tag (optional)">
+    **Type**: String  
+    **Description**: Model variant or quantization identifier
+    
+    Used to distinguish between different versions of the same model.
+    
+    ```yaml
+    tag: w8a8  # INT8 weight, INT8 activation quantization
+    ```
+    
+    Common tags:
+    - `w4a8` - W4A8 quantization (4-bit weights, 8-bit activations)
+    - `w8a8` - W8A8 quantization (8-bit weights, 8-bit activations)
+    - `fp16` - FP16 precision
+    - `main` - Main/default variant
+  </Accordion>
+
+  <Accordion title="capabilities (optional)">
+    **Type**: Array of strings  
+    **Description**: Supported features and modalities
+    
+    Used for filtering and capability discovery.
+    
+    ```yaml
+    capabilities:
+      - completion
+      - vision
+      - tool_use
+    ```
+    
+    **Standard Capabilities**:
+    - `completion` - Text completion/generation
+    - `vision` - Image understanding (multimodal)
+    - `tool_use` - Function calling
+    - `coding` - Code generation
+    - `function_calling` - Structured function calls
+  </Accordion>
+</AccordionGroup>
+
+## Example Configurations
+
+### Text Completion Model
+
+```yaml
+- model_id: qwen2.5-7b-instruct
+  source_id: Qwen/Qwen2.5-7B-Instruct
+  parameters: 7.6
+  context_length: 131072
+  supported_devices:
+    ascend-910b:
+      - vllm:docker
+      - mindie:docker
+    ascend-310p:
+      - vllm:docker
+      - mindie:docker
+      - mlguider:docker
+    metax-c550:
+      - vllm:docker
+  capabilities:
+    - completion
+```
+
+### Vision-Language Model
+
+```yaml
+- model_id: qwen2.5-vl-7b-instruct
+  source_id: Qwen/Qwen2.5-VL-7B-Instruct
+  parameters: 7.0
+  context_length: 32768
+  supported_devices:
+    ascend-910b:
+      - vllm:docker
+      - mindie:docker
+      - mlguider:docker
+    ascend-310p:
+      - vllm:docker
+      - mindie:docker
+    metax-c550:
+      - vllm:docker
+  capabilities:
+    - completion
+    - vision
+```
+
+### Quantized Model
+
+```yaml
+- model_id: qwen3-32b-w8a8
+  source_id: vllm-ascend/Qwen3-32B-W8A8
+  parameters: 32.0
+  context_length: 131072
+  supported_devices:
+    ascend-910b:
+      - vllm:docker
+      - mindie:docker
+  tag: w8a8
+  capabilities:
+    - completion
+```
+
+### Large Model (Multi-Device)
+
+```yaml
+- model_id: qwen2.5-72b-instruct
+  source_id: Qwen/Qwen2.5-72B-Instruct
+  parameters: 72.0
+  context_length: 131072
+  supported_devices:
+    ascend-910b:
+      - vllm:docker      # Requires 8 devices
+      - mindie:docker
+      - mlguider:docker
+    ascend-310p:
+      - vllm:docker
+      - mindie:docker
+      - mlguider:docker
+    metax-c550:
+      - vllm:docker
+  capabilities:
+    - completion
+```
+
+### Specialized Model (OCR)
+
+```yaml
+- model_id: glm-ocr
+  source_id: tsingmao-intelligence/GLM-OCR.ascend
+  parameters: 10.0
+  context_length: 66000
+  supported_devices:
+    ascend-310p:
+      - mlguider:docker
+  capabilities:
+    - completion
+    - vision
+```
+
+### Coding Model
+
+```yaml
+- model_id: qwen3-coder-next
+  source_id: Qwen/Qwen3-Coder-Next
+  parameters: 80.0
+  context_length: 131072
+  supported_devices:
+    ascend-310p:
+      - mlguider:docker
+  capabilities:
+    - completion
+    - coding
+    - tool_use
+```
+
+## Device Compatibility Matrix
+
+Define which models work on which hardware:
+
+<Tabs>
+  <Tab title="Ascend 910B">
+    High-end training and inference NPU. Supports most models.
+    
+    ```yaml
+    supported_devices:
+      ascend-910b:
+        - vllm:docker
+        - mindie:docker
+    ```
+    
+    **Typical Models**:
+    - 7B-72B parameter models
+    - FP16 and quantized variants
+    - Vision-language models
+    - Large context models (128K+)
+  </Tab>
+  
+  <Tab title="Ascend 310P">
+    Inference-optimized NPU. Best for edge and high-throughput scenarios.
+    
+    ```yaml
+    supported_devices:
+      ascend-310p:
+        - vllm:docker
+        - mindie:docker
+        - mlguider:docker
+    ```
+    
+    **Typical Models**:
+    - 7B-32B parameter models
+    - Quantized models (W8A8, W4A8)
+    - OCR and specialized models
+  </Tab>
+  
+  <Tab title="Metax C550">
+    GPU-like accelerator with vLLM support.
+    
+    ```yaml
+    supported_devices:
+      metax-c550:
+        - vllm:docker
+    ```
+    
+    **Typical Models**:
+    - 7B-70B parameter models
+    - Quantized large models (235B W8A8)
+    - Vision-language models
+  </Tab>
+</Tabs>
+
+## Engine Priority and Fallback
+
+Engines are tried in order until one succeeds:
+
+```yaml
+supported_devices:
+  ascend-910b:
+    - vllm:docker      # Try vLLM first
+    - mindie:docker    # Fall back to MindIE if vLLM fails
+    - mlguider:docker  # Fall back to MLGuider if both fail
+```
+
+**Selection Logic**:
+
+1. **Check runtime image availability**: Does the device have this engine's image?
+2. **Check resource availability**: Are enough devices available?
+3. **Attempt startup**: Try to start the container
+4. **On failure**: Try next engine in priority list
+
+<Info>
+  Engine priority allows automatic fallback for maximum reliability.
+</Info>
+
+## Model Groups (Optional)
+
+Logically group related models:
+
+```yaml
+model_groups:
+  qwen2.5:
+    - qwen2.5-7b-instruct
+    - qwen2.5-14b-instruct
+    - qwen2.5-72b-instruct
+  qwen3:
+    - qwen3-8b
+    - qwen3-32b
+  deepseek-r1:
+    - deepseek-r1-distill-qwen-7b
+    - deepseek-r1-distill-qwen-32b
+    - deepseek-r1-distill-llama-70b
+```
+
+**Use Cases**:
+- UI organization and filtering
+- Batch operations on related models
+- Documentation generation
+
+## Validation
+
+Configuration validation checks:
+
+<Check>Version field is present</Check>
+<Check>At least one model defined</Check>
+<Check>No duplicate model_id values</Check>
+<Check>Each model has valid source_id</Check>
+<Check>At least one supported device per model</Check>
+<Check>Engine format is `backend:mode`</Check>
+<Check>Device config_keys exist in devices.yaml</Check>
+<Check>No empty engine lists</Check>
+
+## Adding a New Model
+
+<Steps>
+  <Step title="Choose model_id">
+    Pick a unique, descriptive identifier:
+    
+    ```yaml
+    model_id: llama3-8b-instruct
+    ```
+  </Step>
+  
+  <Step title="Set source_id">
+    Specify the model source:
+    
+    ```yaml
+    source_id: meta-llama/Llama-3-8B-Instruct
+    ```
+  </Step>
+  
+  <Step title="Define specifications">
+    Add model parameters and context length:
+    
+    ```yaml
+    parameters: 8.0
+    context_length: 8192
+    ```
+  </Step>
+  
+  <Step title="Configure device support">
+    List compatible devices and engines:
+    
+    ```yaml
+    supported_devices:
+      ascend-910b:
+        - vllm:docker
+        - mindie:docker
+    ```
+  </Step>
+  
+  <Step title="Add capabilities">
+    Specify model features:
+    
+    ```yaml
+    capabilities:
+      - completion
+    ```
+  </Step>
+  
+  <Step title="Test the model">
+    Validate and deploy:
+    
+    ```bash
+    xw server restart
+    xw model list
+    xw run llama3-8b-instruct
+    ```
+  </Step>
+</Steps>
+
+## Common Model Patterns
+
+### Multi-Architecture Support
+
+Define support for multiple device types:
+
+```yaml
+- model_id: qwen3-32b
+  source_id: Qwen/Qwen3-32B
+  parameters: 32.0
+  context_length: 131072
+  supported_devices:
+    ascend-910b:
+      - vllm:docker
+      - mindie:docker
+    ascend-310p:
+      - vllm:docker
+      - mindie:docker
+      - mlguider:docker
+    metax-c550:
+      - vllm:docker
+  capabilities:
+    - completion
+```
+
+### Quantized Model Family
+
+Provide multiple quantization options:
+
+```yaml
+# Full precision
+- model_id: qwen3-32b
+  source_id: Qwen/Qwen3-32B
+  parameters: 32.0
+  supported_devices:
+    ascend-910b:
+      - vllm:docker
+
+# W8A8 quantized
+- model_id: qwen3-32b-w8a8
+  source_id: vllm-ascend/Qwen3-32B-W8A8
+  parameters: 32.0
+  tag: w8a8
+  supported_devices:
+    ascend-910b:
+      - vllm:docker
+      - mindie:docker
+```
+
+### Device-Specific Models
+
+Models optimized for specific hardware:
+
+```yaml
+- model_id: minimax-m2.1-w4a8
+  source_id: tsingmao-intelligence/MiniMax-M2.1.w4a8.ascend
+  parameters: 0.0
+  context_length: 131072
+  supported_devices:
+    ascend-910b:  # Only on Ascend 910B
+      - vllm:docker
+  tag: w4a8
+  capabilities:
+    - completion
+```
+
+## Best Practices
+
+<Check>Use consistent naming conventions for model_id</Check>
+<Check>Include quantization info in model_id (e.g., `-w8a8`)</Check>
+<Check>Set accurate parameter counts for resource estimation</Check>
+<Check>List engines in order of preference</Check>
+<Check>Document device requirements in comments</Check>
+<Check>Group related models with model_groups</Check>
+<Check>Test model deployment before committing configuration</Check>
+
+<Warning>
+  Model configuration changes require a server restart to take effect.
+</Warning>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Model not appearing in list">
+    **Possible causes**:
+    - Validation error in YAML
+    - Duplicate model_id
+    - Missing required fields
+    
+    **Solution**: Check server logs for validation errors
+    ```bash
+    xw server restart --verbose
+    ```
+  </Accordion>
+
+  <Accordion title="Model fails to deploy">
+    **Possible causes**:
+    - No compatible runtime image in devices.yaml
+    - Device config_key mismatch
+    - Insufficient device resources
+    
+    **Solution**: Verify device configuration
+    ```bash
+    xw device list
+    xw model info {model_id}
+    ```
+  </Accordion>
+
+  <Accordion title="Wrong engine selected">
+    **Possible causes**:
+    - Engine priority order incorrect
+    - Runtime image missing
+    
+    **Solution**: Adjust engine priority in supported_devices
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Runtime Parameters" icon="sliders" href="/configuration/runtime-params">
+    Configure runtime parameters for model deployments
+  </Card>
+  <Card title="Supported Models" icon="list" href="/guides/supported-models">
+    Browse all supported models
+  </Card>
+</CardGroup>

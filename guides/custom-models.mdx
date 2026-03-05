@@ -1,0 +1,564 @@
+---
+title: Adding Custom Models
+description: Configure and deploy custom AI models in XW CLI
+---
+
+XW CLI supports adding custom models through configuration files, allowing you to deploy any compatible model without code changes.
+
+## Model Configuration Schema
+
+Models are defined in `configs/0.0.1/models.yaml` using this structure:
+
+```yaml
+version: "1.0"
+
+models:
+  - model_id: your-model-id
+    source_id: namespace/model-name
+    parameters: 7.0
+    context_length: 4096
+    supported_devices:
+      ascend-910b:
+        - vllm:docker
+        - mindie:docker
+    tag: main
+    capabilities:
+      - completion
+```
+
+## Configuration Fields
+
+### Required Fields
+
+<ParamField path="model_id" type="string" required>
+  Unique identifier for the model within XW CLI.
+  
+  **Convention**: lowercase, hyphen-separated (e.g., `llama3-8b`, `custom-qwen-7b`)
+  
+  <Warning>
+    Must be unique across all models. Duplicates will cause validation errors.
+  </Warning>
+</ParamField>
+
+<ParamField path="source_id" type="string" required>
+  Model identifier on the source platform (ModelScope, HuggingFace, etc.)
+  
+  **Format**: `namespace/model-name`
+  
+  **Examples**:
+  - ModelScope: `qwen/Qwen2-7B`
+  - HuggingFace: `meta-llama/Llama-3-8B`
+  - Custom registry: `myorg/custom-model`
+</ParamField>
+
+<ParamField path="supported_devices" type="object" required>
+  Maps device types to their supported inference engines.
+  
+  **Key**: Device `config_key` from `devices.yaml`
+  
+  **Value**: List of engines in priority order (format: `backend:mode`)
+  
+  ```yaml
+  supported_devices:
+    ascend-910b:      # Device type
+      - vllm:docker   # First choice
+      - mindie:docker # Fallback
+    ascend-310p:
+      - vllm:docker
+      - mlguider:docker
+  ```
+</ParamField>
+
+### Optional Fields
+
+<ParamField path="parameters" type="float">
+  Model size in billions of parameters.
+  
+  Used for informational display and sizing recommendations.
+  
+  **Example**: `7.0` for 7B model, `70.0` for 70B model
+</ParamField>
+
+<ParamField path="context_length" type="integer">
+  Maximum context window size in tokens.
+  
+  **Common values**: `4096`, `8192`, `32768`, `131072`
+</ParamField>
+
+<ParamField path="tag" type="string">
+  Model variant or quantization format.
+  
+  **Examples**: `main`, `fp16`, `int8`, `w8a8`, `w4a8`
+</ParamField>
+
+<ParamField path="capabilities" type="array">
+  List of supported features.
+  
+  **Supported values**:
+  - `completion` - Text generation
+  - `vision` - Image understanding
+  - `coding` - Code generation
+  - `tool_use` - Function calling
+  - `function_calling` - Function calling (alternative)
+</ParamField>
+
+## Step-by-Step Guide
+
+<Steps>
+  <Step title="Locate configuration directory">
+    Find your XW configuration directory:
+    
+    ```bash
+    # Default location
+    cd ~/.xw/0.0.1/
+    
+    # Or system-wide installation
+    cd /etc/xw/0.0.1/
+    ```
+  </Step>
+  
+  <Step title="Edit models.yaml">
+    Open the models configuration file:
+    
+    ```bash
+    vim configs/0.0.1/models.yaml
+    ```
+  </Step>
+  
+  <Step title="Add model entry">
+    Append your model configuration:
+    
+    ```yaml
+    models:
+      # ... existing models ...
+      
+      # Your custom model
+      - model_id: my-custom-model
+        source_id: myorg/custom-llm
+        parameters: 13.0
+        context_length: 8192
+        supported_devices:
+          ascend-910b:
+            - vllm:docker
+          metax-c550:
+            - vllm:docker
+        capabilities:
+          - completion
+          - coding
+    ```
+  </Step>
+  
+  <Step title="Validate configuration">
+    Check for syntax errors:
+    
+    ```bash
+    # Reload XW server to validate
+    xw reload
+    
+    # Check if model appears
+    xw ls | grep my-custom-model
+    ```
+  </Step>
+  
+  <Step title="Test deployment">
+    Try running your custom model:
+    
+    ```bash
+    xw run my-custom-model
+    ```
+  </Step>
+</Steps>
+
+## Device Compatibility
+
+### Checking Device Support
+
+List available device types:
+
+```bash
+xw device list
+```
+
+Output shows `config_key` values to use in `supported_devices`:
+
+```
+Device 0: Ascend 910B [ascend-910b] - Available
+Device 1: Ascend 910B [ascend-910b] - Available
+```
+
+### Supported Engine Combinations
+
+<CardGroup cols={3}>
+  <Card title="Ascend 910B" icon="microchip">
+    - `vllm:docker`
+    - `mindie:docker`
+    - `mlguider:docker`
+  </Card>
+  <Card title="Ascend 310P" icon="chip">
+    - `vllm:docker`
+    - `mindie:docker`
+    - `mlguider:docker`
+  </Card>
+  <Card title="MetaX C550" icon="server">
+    - `vllm:docker`
+  </Card>
+</CardGroup>
+
+<Note>
+  List engines in priority order. XW will try the first engine and fall back to alternatives if unavailable.
+</Note>
+
+## Advanced Configuration
+
+### Runtime Parameters
+
+Define model-specific runtime parameters in `configs/0.0.1/runtime_params.yaml`:
+
+```yaml
+templates:
+  # Format: {device}_{model_id}_{engine}
+  ascend-910b_my-custom-model_vllm:
+    - max_model_len=8192
+    - tensor_parallel_size=2
+    - gpu_memory_utilization=0.9
+```
+
+See [Runtime Parameters](/configuration/runtime-params) for details.
+
+### Custom Docker Images
+
+Specify custom inference engine images:
+
+```yaml
+templates:
+  ascend-910b_my-custom-model_vllm:
+    - image=myregistry.com/custom-vllm:latest
+    - max_model_len=8192
+```
+
+### Device-Specific Variants
+
+Define different configurations per device:
+
+```yaml
+models:
+  - model_id: my-model-910b
+    source_id: myorg/model
+    supported_devices:
+      ascend-910b:
+        - vllm:docker
+  
+  - model_id: my-model-310p
+    source_id: myorg/model
+    supported_devices:
+      ascend-310p:
+        - mindie:docker
+```
+
+## Common Patterns
+
+### Pattern 1: Multi-Engine Support
+
+Provide fallback engines for reliability:
+
+```yaml
+- model_id: reliable-model
+  source_id: org/model
+  supported_devices:
+    ascend-910b:
+      - vllm:docker      # Primary
+      - mindie:docker    # Fallback
+      - mlguider:docker  # Last resort
+```
+
+### Pattern 2: Quantized Variants
+
+Define multiple quantization formats:
+
+```yaml
+- model_id: llama3-70b
+  source_id: meta-llama/Llama-3-70B
+  supported_devices:
+    ascend-910b:
+      - vllm:docker
+
+- model_id: llama3-70b-w8a8
+  source_id: custom/llama3-70b-w8a8
+  tag: w8a8
+  supported_devices:
+    ascend-910b:
+      - vllm:docker
+```
+
+### Pattern 3: Vision Models
+
+Enable multimodal capabilities:
+
+```yaml
+- model_id: custom-vision-model
+  source_id: org/vision-model
+  parameters: 14.0
+  context_length: 32768
+  supported_devices:
+    ascend-910b:
+      - vllm:docker
+  capabilities:
+    - completion
+    - vision
+```
+
+## Validation Rules
+
+Configuration validation is performed in `internal/config/model_config.go:237`:
+
+<AccordionGroup>
+  <Accordion title="Duplicate model_id">
+    **Error**: `duplicate model_id: my-model`
+    
+    **Cause**: Two models have the same `model_id`
+    
+    **Solution**: Use unique IDs, possibly with suffixes:
+    ```yaml
+    - model_id: my-model-910b
+    - model_id: my-model-310p
+    ```
+  </Accordion>
+  
+  <Accordion title="Missing source_id">
+    **Error**: `model my-model: source_id is required`
+    
+    **Cause**: `source_id` field is empty
+    
+    **Solution**: Provide a valid source identifier:
+    ```yaml
+    source_id: myorg/model-name
+    ```
+  </Accordion>
+  
+  <Accordion title="No supported devices">
+    **Error**: `model my-model: at least one supported device is required`
+    
+    **Cause**: `supported_devices` is empty
+    
+    **Solution**: Add at least one device mapping:
+    ```yaml
+    supported_devices:
+      ascend-910b:
+        - vllm:docker
+    ```
+  </Accordion>
+  
+  <Accordion title="Invalid engine format">
+    **Error**: `invalid format 'vllm', expected 'backend:mode'`
+    
+    **Cause**: Engine string missing `:mode` suffix
+    
+    **Solution**: Use correct format:
+    ```yaml
+    - vllm:docker  # Correct
+    - vllm         # Wrong!
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Model Download
+
+After adding a model, download it:
+
+```bash
+# Download from configured source
+xw pull my-custom-model
+
+# Check download status
+ls ~/.xw/models/my-custom-model/
+```
+
+Downloaded models are stored in:
+- **Default**: `~/.xw/models/<model-id>/`
+- **Custom**: Set `XW_MODELS_DIR` environment variable
+
+## Testing Custom Models
+
+### Validation Checklist
+
+<Steps>
+  <Step title="Configuration loads">
+    ```bash
+    xw reload  # Should complete without errors
+    ```
+  </Step>
+  
+  <Step title="Model appears in list">
+    ```bash
+    xw ls | grep my-custom-model
+    ```
+  </Step>
+  
+  <Step title="Download succeeds">
+    ```bash
+    xw pull my-custom-model
+    ```
+  </Step>
+  
+  <Step title="Model runs">
+    ```bash
+    xw run my-custom-model
+    xw ps  # Should show running instance
+    ```
+  </Step>
+  
+  <Step title="Inference works">
+    ```bash
+    curl http://localhost:8000/v1/completions \
+      -H "Content-Type: application/json" \
+      -d '{
+        "model": "my-custom-model",
+        "prompt": "Hello",
+        "max_tokens": 50
+      }'
+    ```
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+### Model Not Appearing
+
+**Symptom**: Model doesn't show in `xw ls`
+
+**Causes**:
+1. Syntax error in YAML → Check `xw reload` output
+2. No compatible devices → Check `supported_devices` matches `xw device list`
+3. Validation failed → Check server logs
+
+**Solution**:
+```bash
+# Check configuration syntax
+xw reload
+
+# View server logs
+xw logs --system
+
+# Verify device compatibility
+xw device list
+```
+
+### Pull Fails
+
+**Error**: `failed to download model from source`
+
+**Solutions**:
+1. Check `source_id` is correct
+2. Verify network connectivity to model source
+3. Check authentication if using private registry
+
+### Run Fails Immediately
+
+**Error**: `failed to start instance`
+
+**Check**:
+1. Docker image available:
+   ```bash
+   docker images | grep vllm
+   ```
+2. Device allocation:
+   ```bash
+   xw device list  # All devices available?
+   ```
+3. Runtime logs:
+   ```bash
+   xw logs my-custom-model
+   ```
+
+## Examples
+
+### Example 1: Fine-tuned Qwen Model
+
+```yaml
+- model_id: qwen2-7b-finetuned
+  source_id: myorg/qwen2-7b-custom
+  parameters: 7.6
+  context_length: 32768
+  supported_devices:
+    ascend-910b:
+      - vllm:docker
+    ascend-310p:
+      - vllm:docker
+  capabilities:
+    - completion
+```
+
+### Example 2: Quantized Custom Model
+
+```yaml
+- model_id: custom-70b-w4a8
+  source_id: myregistry/custom-70b-quantized
+  parameters: 70.0
+  context_length: 8192
+  tag: w4a8
+  supported_devices:
+    ascend-910b:
+      - vllm:docker
+      - mindie:docker
+  capabilities:
+    - completion
+```
+
+### Example 3: Multi-Device Required Model
+
+```yaml
+- model_id: huge-model-175b
+  source_id: myorg/huge-model
+  parameters: 175.0
+  context_length: 4096
+  supported_devices:
+    ascend-910b:
+      - vllm:docker
+  capabilities:
+    - completion
+```
+
+With runtime template:
+
+```yaml
+# runtime_params.yaml
+templates:
+  ascend-910b_huge-model-175b_vllm:
+    - world_size=8
+    - tensor_parallel_size=8
+    - max_model_len=4096
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Naming Convention" icon="tag">
+    Use descriptive, consistent names:
+    - `{base}-{size}-{variant}`
+    - Example: `qwen2-7b-medical`
+  </Card>
+  
+  <Card title="Version Control" icon="code-branch">
+    Track changes:
+    - Keep `models.yaml` in version control
+    - Document custom models in README
+  </Card>
+  
+  <Card title="Testing" icon="flask">
+    Validate before production:
+    - Test on single device first
+    - Verify inference quality
+    - Benchmark performance
+  </Card>
+  
+  <Card title="Documentation" icon="book">
+    Document custom models:
+    - Source and training details
+    - Optimal runtime parameters
+    - Known limitations
+  </Card>
+</CardGroup>
+
+<Note>
+  For detailed schema documentation, see `internal/config/model_config.go:24-64`.
+</Note>

@@ -1,0 +1,121 @@
+---
+title: xw serve
+description: Start the XW HTTP server for handling API requests
+---
+
+## Usage
+
+```bash
+xw serve [flags]
+```
+
+## Description
+
+Start the XW HTTP server for handling API requests. This command is primarily intended for development and testing. In production deployments, use the dedicated `xw-server` binary with systemd.
+
+The server listens for HTTP requests and manages model execution on domestic chip devices. Press Ctrl+C to gracefully shut down the server.
+
+## Options
+
+<ParamField path="--host" type="string" default="localhost">
+  Server host address to bind to
+</ParamField>
+
+<ParamField path="--port" type="int" default="11581">
+  Server port to listen on (must be between 1-65535)
+</ParamField>
+
+<ParamField path="--data" type="string" default="~/.xw/data">
+  Data directory for models and runtime data
+</ParamField>
+
+<ParamField path="--config" type="string" default="~/.xw">
+  Directory containing configuration files
+</ParamField>
+
+<ParamField path="-v, --verbose" type="boolean" default="false">
+  Enable verbose logging with debug information
+</ParamField>
+
+## Examples
+
+### Start server on default settings
+
+```bash
+xw serve
+```
+
+Starts the server on `localhost:11581`.
+
+### Start server on all interfaces
+
+```bash
+xw serve --host 0.0.0.0
+```
+
+Allows connections from any network interface.
+
+### Start server on custom port
+
+```bash
+xw serve --port 9090
+```
+
+Runs the server on port 9090 instead of the default.
+
+### Start with verbose logging
+
+```bash
+xw serve -v
+```
+
+Enables debug logging for troubleshooting.
+
+### Use custom directories
+
+```bash
+xw serve --data /path/to/data --config /path/to/config
+```
+
+Specify custom paths for data and configuration storage.
+
+## Output
+
+When the server starts successfully, you'll see:
+
+```
+Server identity: <server-name>
+Configuration version: <version>
+Loading configurations from: <config-dir>
+Data directory: <data-dir>
+All configurations loaded successfully
+Press Ctrl+C to stop
+```
+
+## Error Handling
+
+If the port is already in use:
+
+```
+Port 11581 is already in use
+Please stop the existing server or use a different port with --port
+```
+
+If configuration version is not found:
+
+```
+Configuration version <version> not found locally, attempting to download...
+Downloading configuration version <version>...
+Configuration downloaded successfully
+```
+
+## Related Commands
+
+- [`xw ps`](/cli/ps) - List running instances
+- [`xw run`](/cli/run) - Run a model with interactive chat
+- [`xw start`](/cli/start) - Start a model instance
+
+## See Also
+
+- [Configuration](/configuration/overview) - Learn about XW configuration files
+- [Deployment](/deployment/systemd) - Production deployment guide

@@ -1,0 +1,198 @@
+---
+title: xw run
+description: Run a model with interactive chat session
+---
+
+## Usage
+
+```bash
+xw run MODEL [flags]
+```
+
+## Description
+
+Run a model and start an interactive chat session. This command combines instance management and chat interaction:
+
+1. Checks if the model instance is already running
+2. Starts the instance if not running
+3. Waits for the instance to be ready
+4. Launches an interactive chat session
+
+If `--alias` is not specified, the model ID is used as the alias.
+
+## Arguments
+
+<ParamField path="MODEL" type="string" required>
+  Name or ID of the model to run (e.g., `qwen2.5-7b-instruct`)
+</ParamField>
+
+## Options
+
+<ParamField path="--alias" type="string">
+  Instance alias (defaults to model ID if not specified)
+</ParamField>
+
+<ParamField path="--engine" type="string">
+  Inference engine in format `backend:mode` (e.g., `vllm:docker`, `mindie:native`). If not specified, XW automatically selects the best available engine.
+</ParamField>
+
+<ParamField path="--device" type="string">
+  Device list to use (e.g., `0` or `0,1,2,3`). If not specified, the system automatically allocates available devices.
+</ParamField>
+
+<ParamField path="--tp" type="int">
+  Tensor parallelism degree (must be 1, 2, 4, or 8)
+</ParamField>
+
+<ParamField path="-v, --verbose" type="boolean" default="false">
+  Enable verbose logging
+</ParamField>
+
+## Examples
+
+### Run with default settings
+
+```bash
+xw run qwen2.5-7b-instruct
+```
+
+Starts the model and opens an interactive chat.
+
+### Run with custom alias
+
+```bash
+xw run qwen2.5-7b-instruct --alias my-chat
+```
+
+Uses a custom alias for the instance.
+
+### Run with specific engine
+
+```bash
+xw run qwen2-7b --engine vllm:docker
+```
+
+Forces the use of vLLM in Docker mode.
+
+### Run on specific devices
+
+```bash
+xw run qwen2.5-7b-instruct --device 0,1
+```
+
+Runs the model on devices 0 and 1.
+
+### Run with tensor parallelism
+
+```bash
+xw run qwen2.5-7b-instruct --tp 4 --device 0,1,2,3
+```
+
+Uses 4-way tensor parallelism across 4 devices.
+
+## Interactive Chat Commands
+
+Once the chat session starts, you can use these commands:
+
+<ParamField path="/h, /?" type="command">
+  Show help with available commands
+</ParamField>
+
+<ParamField path="/quit" type="command">
+  Exit the chat session
+</ParamField>
+
+<ParamField path="/clear" type="command">
+  Clear conversation history
+</ParamField>
+
+<ParamField path="/history" type="command">
+  Show conversation history
+</ParamField>
+
+<ParamField path="/show" type="command">
+  Show current configuration (temperature, top-p, etc.)
+</ParamField>
+
+<ParamField path="/set <param> <value>" type="command">
+  Set a parameter:
+  - `system-prompt <text>` - Set system prompt
+  - `temperature <0-2>` - Set temperature (default: 0.7)
+  - `top-p <0-1>` - Set top-p (default: 0.9)
+  - `max-tokens <number>` - Set max tokens (default: 2048)
+</ParamField>
+
+## Output
+
+### Starting a new instance
+
+```
+Starting new instance: qwen2.5-7b-instruct
+⠋ Waiting for instance to be ready... 15s
+✓ Instance is ready!
+
+============================================================
+Chat session started with: qwen2.5-7b-instruct
+Type your message and press Enter. Use '/h' or '/?' for help, '/quit' to exit.
+============================================================
+
+>>>
+```
+
+### Using an existing instance
+
+```
+Found existing instance: qwen2.5-7b-instruct (state: ready)
+
+============================================================
+Chat session started with: qwen2.5-7b-instruct
+Type your message and press Enter. Use '/h' or '/?' for help, '/quit' to exit.
+============================================================
+
+>>>
+```
+
+### Chat example
+
+```
+>>> Hello, how are you?
+
+Assistant: Hello! I'm doing well, thank you for asking. How can I help you today?
+
+>>> /set temperature 0.5
+Temperature set to: 0.50
+
+>>> /quit
+Goodbye!
+```
+
+## Error Handling
+
+If the instance fails to start:
+
+```
+✗ Instance failed to start (state: error)
+  Error: insufficient GPU memory
+
+Use 'xw ps -a' to view instance details
+Use 'xw stop' to remove the failed instance
+```
+
+## Keyboard Shortcuts
+
+- **Ctrl+C** during startup: Cancel and return to shell
+- **Ctrl+C** during chat: Cancel current request (chat continues)
+- **Up/Down arrows**: Navigate command history
+- **Ctrl+D** or `/quit`: Exit chat session
+
+## Related Commands
+
+- [`xw start`](/cli/start) - Start an instance without chat
+- [`xw ps`](/cli/ps) - List running instances
+- [`xw stop`](/cli/stop) - Stop an instance
+- [`xw logs`](/cli/logs) - View instance logs
+
+## See Also
+
+- [Chat API](/api/openai/chat) - Programmatic chat interface
+- [Model Configuration](/configuration/models) - Model-specific settings

@@ -1,0 +1,611 @@
+---
+title: Runtime Parameters
+description: Configure runtime parameter templates for model deployment optimization
+---
+
+The runtime parameters configuration file (`runtime_params.yaml`) defines parameter templates for specific combinations of devices, models, and inference engines. These templates provide optimized default parameters for model deployments.
+
+## Configuration Structure
+
+```yaml
+version: "1.0"
+
+templates:
+  - name: ascend-910b_qwen2.5-7b-instruct_vllm
+    params:
+      - gpu_memory_utilization=0.9
+      - max_model_len=32768
+      - tensor_parallel_size=1
+      - world_size=1
+      - server_port=8000
+      - model_name=qwen2.5-7b-instruct
+```
+
+## Template Definition
+
+### Template Fields
+
+<AccordionGroup>
+  <Accordion title="name (required)">
+    **Type**: String  
+    **Format**: `{chip_config_key}_{model_id}_{backend_name}`
+    
+    **Description**: Unique identifier matching device, model, and engine
+    
+    Template name components:
+    - `chip_config_key`: From devices.yaml (e.g., `ascend-910b`)
+    - `model_id`: From models.yaml (e.g., `qwen2.5-7b-instruct`)
+    - `backend_name`: Engine name without mode (e.g., `vllm`, not `vllm:docker`)
+    
+    ```yaml
+    name: ascend-910b_qwen2.5-7b-instruct_vllm
+    #     ^^^^^^^^^^^ ^^^^^^^^^^^^^^^^^^^^ ^^^^^
+    #     device      model                engine
+    ```
+    
+    Examples:
+    - `ascend-910b_qwen2.5-7b-instruct_vllm`
+    - `ascend-310p_qwen3-32b_mindie`
+    - `metax-c550_glm-4.7-w8a8_vllm`
+    
+    <Warning>Template name must be globally unique</Warning>
+  </Accordion>
+
+  <Accordion title="params (required)">
+    **Type**: Array of strings  
+    **Format**: `key=value`
+    
+    **Description**: List of parameter key-value pairs
+    
+    Parameters are converted to environment variables:
+    - Camel case → UPPER_SNAKE_CASE (e.g., `tensorParallel` → `TENSOR_PARALLEL`)
+    - Kebab case → UPPER_SNAKE_CASE (e.g., `tensor-parallel` → `TENSOR_PARALLEL`)
+    
+    ```yaml
+    params:
+      - gpu_memory_utilization=0.9
+      - max_model_len=32768
+      - tensor_parallel_size=1
+    ```
+    
+    Empty values are allowed:
+    ```yaml
+    params:
+      - extra_args=  # Empty value is valid
+    ```
+  </Accordion>
+
+  <Accordion title="envs (optional)">
+    **Type**: Map of key-value pairs  
+    **Description**: Static environment variables
+    
+    Additional environment variables that don't follow the param format.
+    
+    ```yaml
+    envs:
+      VLLM_USE_V1: "0"
+      LOG_LEVEL: "INFO"
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Common Parameters
+
+### Memory Configuration
+
+<AccordionGroup>
+  <Accordion title="gpu_memory_utilization">
+    **Type**: Float (0.0 - 1.0)  
+    **Default**: 0.9  
+    **Description**: Fraction of device memory to use
+    
+    Controls how much device memory the inference engine can utilize.
+    
+    ```yaml
+    - gpu_memory_utilization=0.9  # Use 90% of device memory
+    ```
+    
+    **Recommendations**:
+    - `0.85-0.9`: Ascend 910B (large models)
+    - `0.8-0.85`: Ascend 310P (smaller models)
+    - `0.9`: Metax C550
+    
+    <Info>Lower values leave memory for system operations and reduce OOM risk</Info>
+  </Accordion>
+
+  <Accordion title="max_model_len">
+    **Type**: Integer  
+    **Unit**: Tokens  
+    **Description**: Maximum context length to support
+    
+    Limits the maximum sequence length for inference.
+    
+    ```yaml
+    - max_model_len=32768  # Support up to 32K tokens
+    ```
+    
+    Common values:
+    - `4096` - 4K context (edge deployments)
+    - `8192` - 8K context (standard)
+    - `32768` - 32K context (extended)
+    - `131072` - 128K context (long-form)
+    
+    <Warning>Larger context lengths require more memory</Warning>
+  </Accordion>
+</AccordionGroup>
+
+### Parallelism Configuration
+
+<AccordionGroup>
+  <Accordion title="tensor_parallel_size">
+    **Type**: Integer  
+    **Description**: Number of devices for tensor parallelism
+    
+    Splits model tensors across multiple devices.
+    
+    ```yaml
+    - tensor_parallel_size=4  # Distribute across 4 devices
+    ```
+    
+    **Guidelines**:
+    - Single-device models: `1`
+    - 7B-14B models: `1-2`
+    - 32B models: `4`
+    - 72B+ models: `8`
+    
+    Must match `world_size` for data parallelism or be a divisor of it.
+  </Accordion>
+
+  <Accordion title="world_size">
+    **Type**: Integer  
+    **Description**: Total number of devices in the deployment
+    
+    Total device count for distributed inference.
+    
+    ```yaml
+    - world_size=4  # Use 4 devices total
+    ```
+    
+    Relationship:
+    - `world_size = tensor_parallel_size` (tensor parallelism only)
+    - `world_size = tensor_parallel_size × pipeline_parallel_size` (pipeline + tensor)
+    
+    ```yaml
+    # Tensor parallelism only
+    - tensor_parallel_size=4
+    - world_size=4
+    
+    # Pipeline + Tensor parallelism
+    - tensor_parallel_size=2
+    - pipeline_parallel_size=2
+    - world_size=4  # 2 × 2
+    ```
+  </Accordion>
+
+  <Accordion title="pipeline_parallel_size">
+    **Type**: Integer  
+    **Default**: 1  
+    **Description**: Number of pipeline stages
+    
+    Splits model layers across devices (MLGuider/MindIE).
+    
+    ```yaml
+    - pipeline_parallel=2  # Split into 2 pipeline stages
+    ```
+    
+    <Info>Primarily used with MLGuider backend</Info>
+  </Accordion>
+
+  <Accordion title="expert_parallel">
+    **Type**: Integer  
+    **Default**: 1  
+    **Description**: Expert parallelism for MoE models
+    
+    Distributes mixture-of-experts (MoE) across devices.
+    
+    ```yaml
+    - expert_parallel=4  # Distribute experts across 4 devices
+    ```
+    
+    Only applicable for MoE models (e.g., Qwen-MoE, DeepSeek-MoE).
+  </Accordion>
+</AccordionGroup>
+
+### Network Configuration
+
+<AccordionGroup>
+  <Accordion title="server_port">
+    **Type**: Integer  
+    **Default**: 8000  
+    **Description**: HTTP server port for API
+    
+    ```yaml
+    - server_port=8000
+    ```
+    
+    The inference engine exposes its API on this port.
+  </Accordion>
+
+  <Accordion title="api_port">
+    **Type**: Integer  
+    **Description**: Alternative port parameter (MLGuider)
+    
+    ```yaml
+    - api_port=8000  # MLGuider uses 'api_port' instead of 'server_port'
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Model Configuration
+
+<AccordionGroup>
+  <Accordion title="model_name">
+    **Type**: String  
+    **Description**: Model identifier passed to engine
+    
+    Should match the model_id from models.yaml.
+    
+    ```yaml
+    - model_name=qwen2.5-7b-instruct
+    ```
+  </Accordion>
+
+  <Accordion title="extra_args">
+    **Type**: String  
+    **Description**: Additional engine-specific arguments
+    
+    Pass custom flags to the inference engine.
+    
+    ```yaml
+    - extra_args=--quantization ascend --trust-remote-code
+    ```
+    
+    Common uses:
+    - Quantization: `--quantization ascend`
+    - Trust remote code: `--trust-remote-code`
+    - Eager execution: `--enforce-eager`
+  </Accordion>
+</AccordionGroup>
+
+## Engine-Specific Parameters
+
+### vLLM Parameters
+
+<Tabs>
+  <Tab title="Standard Parameters">
+    ```yaml
+    - name: ascend-910b_qwen2.5-7b-instruct_vllm
+      params:
+        - gpu_memory_utilization=0.9
+        - max_model_len=32768
+        - tensor_parallel_size=1
+        - world_size=1
+        - server_port=8000
+        - model_name=qwen2.5-7b-instruct
+    ```
+  </Tab>
+  
+  <Tab title="Quantized Model">
+    ```yaml
+    - name: ascend-910b_minimax-m2.1-w4a8_vllm
+      envs:
+        VLLM_USE_V1: "0"
+      params:
+        - gpu_memory_utilization=0.85
+        - max_model_len=32768
+        - tensor_parallel_size=4
+        - world_size=4
+        - model_name=minimax-m2.1-w4a8
+        - extra_args=--quantization ascend --trust-remote-code --enforce-eager
+    ```
+  </Tab>
+  
+  <Tab title="Large Model">
+    ```yaml
+    - name: ascend-910b_qwen2.5-72b-instruct_vllm
+      params:
+        - gpu_memory_utilization=0.9
+        - max_model_len=32768
+        - tensor_parallel_size=8
+        - world_size=8
+        - server_port=8000
+        - model_name=qwen2.5-72b-instruct
+    ```
+  </Tab>
+</Tabs>
+
+### MindIE Parameters
+
+```yaml
+- name: ascend-910b_qwen2.5-7b-instruct_mindie
+  params:
+    - gpu_memory_utilization=0.9
+    - max_model_len=32768
+    - tensor_parallel_size=1
+    - world_size=1
+    - server_port=8000
+    - model_name=qwen2.5-7b-instruct
+```
+
+### MLGuider Parameters
+
+```yaml
+- name: ascend-310p_qwen3-32b_mlguider
+  params:
+    - pipeline_parallel=1
+    - tensor_parallel=4
+    - expert_parallel=1
+    - world_size=4
+    - api_port=8000
+    - mi_username=tsingmao-xuanwu
+    - mi_secret=tsingmao2026
+```
+
+<Info>
+  MLGuider uses different parameter names: `pipeline_parallel`, `tensor_parallel`, `api_port`
+</Info>
+
+## Parameter Templating Patterns
+
+### Small Model (Single Device)
+
+```yaml
+- name: ascend-910b_qwen3-8b_vllm
+  params:
+    - gpu_memory_utilization=0.9
+    - max_model_len=32768
+    - tensor_parallel_size=1
+    - world_size=1
+    - server_port=8000
+    - model_name=qwen3-8b
+    - extra_args=
+```
+
+### Medium Model (2-4 Devices)
+
+```yaml
+- name: ascend-910b_qwen3-32b_vllm
+  params:
+    - gpu_memory_utilization=0.9
+    - max_model_len=32768
+    - tensor_parallel_size=4
+    - world_size=4
+    - server_port=8000
+    - model_name=qwen3-32b
+    - extra_args=
+```
+
+### Large Model (8 Devices)
+
+```yaml
+- name: ascend-910b_qwen2.5-72b-instruct_vllm
+  params:
+    - gpu_memory_utilization=0.9
+    - max_model_len=32768
+    - tensor_parallel_size=8
+    - world_size=8
+    - server_port=8000
+    - model_name=qwen2.5-72b-instruct
+```
+
+### Quantized Model
+
+```yaml
+- name: ascend-910b_qwen3-32b-w8a8_vllm
+  params:
+    - gpu_memory_utilization=0.9
+    - max_model_len=32768
+    - tensor_parallel_size=4
+    - world_size=4
+    - model_name=qwen3-32b-w8a8
+    - extra_args=--quantization ascend
+```
+
+### Vision Model
+
+```yaml
+- name: ascend-910b_qwen2.5-vl-7b-instruct_vllm
+  params:
+    - gpu_memory_utilization=0.9
+    - max_model_len=32768
+    - tensor_parallel_size=1
+    - world_size=1
+    - server_port=8000
+    - model_name=qwen2.5-vl-7b-instruct
+    - extra_args=
+```
+
+### Custom Docker Image
+
+```yaml
+- name: ascend-910b_glm-5_vllm
+  params:
+    - gpu_memory_utilization=0.9
+    - max_model_len=6000
+    - tensor_parallel_size=8
+    - world_size=8
+    - server_port=8000
+    - model_name=glm-5
+    - image=harbor.tsingmao.com/xw-cli/vllm-ascend:glm5-arm64
+```
+
+<Info>
+  The `image` parameter overrides the default runtime image from devices.yaml
+</Info>
+
+## Device-Specific Templates
+
+### Ascend 910B Templates
+
+```yaml
+# 7B model
+- name: ascend-910b_qwen2.5-7b-instruct_vllm
+  params:
+    - gpu_memory_utilization=0.9
+    - max_model_len=32768
+    - tensor_parallel_size=1
+    - world_size=1
+
+# 32B model
+- name: ascend-910b_qwen3-32b_vllm
+  params:
+    - gpu_memory_utilization=0.9
+    - max_model_len=32768
+    - tensor_parallel_size=4
+    - world_size=4
+
+# 72B model
+- name: ascend-910b_qwen2.5-72b-instruct_vllm
+  params:
+    - gpu_memory_utilization=0.9
+    - max_model_len=32768
+    - tensor_parallel_size=8
+    - world_size=8
+```
+
+### Ascend 310P Templates
+
+```yaml
+# 7B model
+- name: ascend-310p_qwen2.5-7b-instruct_vllm
+  params:
+    - gpu_memory_utilization=0.8  # Lower for 310P
+    - max_model_len=32768
+    - tensor_parallel_size=1
+    - world_size=1
+
+# 32B model
+- name: ascend-310p_qwen3-32b_vllm
+  params:
+    - gpu_memory_utilization=0.8
+    - max_model_len=8192  # Reduced context
+    - tensor_parallel_size=4
+    - world_size=4
+```
+
+### Metax C550 Templates
+
+```yaml
+# Standard model
+- name: metax-c550_qwen3-32b_vllm
+  params:
+    - vllm_use_v1=0
+    - max_model_len=32768
+    - tensor_parallel_size=4
+    - world_size=4
+    - gpu_memory_utilization=0.9
+
+# Large quantized model
+- name: metax-c550_qwen3-235b-a22b-w8a8_vllm
+  params:
+    - vllm_use_v1=0
+    - max_model_len=40960
+    - tensor_parallel_size=8
+    - world_size=8
+    - gpu_memory_utilization=0.9
+```
+
+## Parameter Override
+
+Template parameters provide defaults but can be overridden:
+
+```bash
+# Use template defaults
+xw run qwen2.5-7b-instruct
+
+# Override specific parameters
+xw run qwen2.5-7b-instruct --max-model-len 16384 --gpu-memory-utilization 0.8
+```
+
+## Optional Configuration
+
+<Info>
+  The `runtime_params.yaml` file is **optional**. If not present, XW CLI uses sensible defaults.
+</Info>
+
+Default behavior when no template exists:
+- Single device allocation
+- Standard memory utilization (0.9)
+- Default context length from model config
+- No additional engine arguments
+
+## Validation
+
+Configuration validation checks:
+
+<Check>Version field is present</Check>
+<Check>No duplicate template names</Check>
+<Check>Parameters in `key=value` format</Check>
+<Check>Keys cannot be empty</Check>
+<Check>Values can be empty</Check>
+<Check>Template names match pattern `{device}_{model}_{engine}`</Check>
+
+## Best Practices
+
+<Check>Create templates for commonly used model configurations</Check>
+<Check>Use conservative memory utilization values</Check>
+<Check>Match tensor_parallel_size to model size requirements</Check>
+<Check>Document parameter choices with YAML comments</Check>
+<Check>Test parameter templates before production use</Check>
+<Check>Keep templates updated with model additions</Check>
+
+<Warning>
+  Parameter configuration changes require a server restart to take effect.
+</Warning>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Template not found">
+    **Possible causes**:
+    - Template name doesn't match device/model/engine combination
+    - Typo in template name
+    
+    **Solution**: Verify template naming
+    ```yaml
+    # Correct format
+    name: ascend-910b_qwen2.5-7b-instruct_vllm
+    #     ^^^^^^^^^^^ device from devices.yaml
+    #                 ^^^^^^^^^^^^^^^^^^^^ model from models.yaml
+    #                                      ^^^^ engine name (not vllm:docker)
+    ```
+  </Accordion>
+
+  <Accordion title="Out of memory errors">
+    **Possible causes**:
+    - `gpu_memory_utilization` too high
+    - `max_model_len` too large
+    - Insufficient `tensor_parallel_size`
+    
+    **Solution**: Reduce memory parameters
+    ```yaml
+    - gpu_memory_utilization=0.85  # Lower from 0.9
+    - max_model_len=16384          # Reduce from 32768
+    ```
+  </Accordion>
+
+  <Accordion title="Invalid parameter format">
+    **Error**: `parameter must be in key=value format`
+    
+    **Solution**: Use `=` separator, not `:` or space
+    ```yaml
+    # Correct
+    - gpu_memory_utilization=0.9
+    
+    # Incorrect
+    - gpu_memory_utilization: 0.9  # Wrong: YAML map syntax
+    - gpu_memory_utilization 0.9   # Wrong: missing separator
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Multi-Device Setup" icon="microchip" href="/guides/multi-device">
+    Configure tensor parallelism across devices
+  </Card>
+  <Card title="Custom Models" icon="wand-magic-sparkles" href="/guides/custom-models">
+    Add custom models to XW CLI
+  </Card>
+</CardGroup>

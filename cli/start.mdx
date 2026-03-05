@@ -1,0 +1,135 @@
+---
+title: xw start
+description: Start a model instance for inference
+---
+
+Start a model instance for inference. The start command manages the lifecycle of model instances, supporting both Docker and native deployment modes.
+
+## Synopsis
+
+```bash
+xw start MODEL [flags]
+```
+
+## Description
+
+The `start` command launches a model instance for inference. By default, it runs in foreground mode with log streaming. Press Ctrl+C to stop and remove the instance. Use `-d/--detach` to run in background mode.
+
+Starting the same model multiple times will return the existing instance rather than creating duplicates.
+
+### Engine Selection
+
+Engine is specified as `backend:mode` (e.g., `vllm:docker`, `mindie:native`). If not specified, xw will automatically select the best available engine based on the model's preferences and your system configuration.
+
+Available engines:
+- `vllm:docker` - vLLM in Docker container (recommended)
+- `vllm:native` - vLLM native installation
+- `mindie:docker` - MindIE in Docker container
+- `mindie:native` - MindIE native installation
+
+### Device Selection
+
+Specify which AI accelerator devices to use (e.g., `--device 0` or `--device 0,1,2,3`). If not specified, the system will automatically allocate available devices.
+
+### Concurrency Control
+
+Use `--max-concurrent` to limit concurrent inference requests per instance. Default: 0 (unlimited). Useful for controlling load on the inference service.
+
+## Options
+
+<ParamField path="--alias" type="string">
+  Instance alias for inference (defaults to model name)
+</ParamField>
+
+<ParamField path="--engine" type="string">
+  Inference engine in format `backend:mode` (e.g., `vllm:docker`, `mindie:native`)
+</ParamField>
+
+<ParamField path="--device" type="string">
+  Device list (e.g., `0` or `0,1,2,3`)
+</ParamField>
+
+<ParamField path="--tp" type="integer">
+  Tensor parallelism degree (must be 1, 2, 4, or 8)
+</ParamField>
+
+<ParamField path="--max-concurrent" type="integer" default="0">
+  Maximum concurrent requests (0 for unlimited)
+</ParamField>
+
+<ParamField path="-d, --detach" type="boolean" default="false">
+  Run instance in the background (default: run in foreground with logs)
+</ParamField>
+
+## Examples
+
+### Start in foreground (default)
+
+Shows logs, press Ctrl+C to stop:
+
+```bash
+xw start qwen2-7b
+```
+
+### Start in background (detached)
+
+```bash
+xw start qwen2-7b -d
+```
+
+### Start with specific engine
+
+```bash
+xw start qwen2-7b --engine vllm:docker
+```
+
+### Start with custom alias
+
+```bash
+xw start qwen2-7b --alias my-model
+```
+
+### Start on specific devices with concurrency limit
+
+```bash
+xw start qwen2-72b --device 0,1,2,3 --max-concurrent 4
+```
+
+### Start with tensor parallelism
+
+```bash
+xw start qwen2-72b --tp 4 --device 0,1,2,3
+```
+
+## Output
+
+When starting a model, you'll see progress updates:
+
+```
+Starting qwen2-7b with auto engine (auto mode)...
+
+▸ Pulling Docker image: registry.example.com/vllm:latest
+▸ Successfully pulled Docker image
+▸ Resources pre-allocated. Initializing inference service...
+
+Streaming logs from qwen2-7b (press Ctrl+C to stop and remove)...
+
+INFO: Model loaded successfully
+INFO: Server ready to accept requests
+```
+
+In detached mode, the output is minimal:
+
+```
+Starting qwen2-7b with auto engine (auto mode)...
+
+✓ Resources pre-allocated. Initializing inference service...
+
+Use 'xw ps' to view running instances
+```
+
+## See Also
+
+- [xw ps](/cli/ps) - List running model instances
+- [xw stop](/cli/stop) - Stop running instances
+- [xw logs](/cli/logs) - View instance logs

@@ -1,0 +1,159 @@
+---
+title: 'Authentication'
+description: 'XW API authentication and security model'
+---
+
+## Overview
+
+The XW CLI API is designed as a **local-only service** and does not implement authentication mechanisms.
+
+## Local-Only Design
+
+The API server:
+
+- Binds to `localhost` (127.0.0.1) by default
+- Is intended for use by local CLI commands and tools
+- Does not support remote access or network exposure
+- Has no user accounts, tokens, or API keys
+
+<Warning>
+**Security Notice**: The XW API has no authentication. Do not expose it to untrusted networks or the internet.
+</Warning>
+
+## Network Configuration
+
+### Default Settings
+
+```yaml
+Host: localhost
+Port: 11581
+```
+
+### Changing the Port
+
+You can configure the port when starting the server:
+
+```bash
+xw serve --port 12000
+```
+
+### Accessing the API
+
+The API is accessible only from the local machine:
+
+```bash
+# This works
+curl http://localhost:11581/api/health
+
+# This also works
+curl http://127.0.0.1:11581/api/health
+
+# This will NOT work from other machines
+curl http://<your-ip>:11581/api/health
+```
+
+## Security Best Practices
+
+### 1. Network Isolation
+
+- Keep the API server on `localhost` only
+- Do not bind to `0.0.0.0` or public network interfaces
+- Use firewalls to block external access to the API port
+
+### 2. Local Access Control
+
+- Run the server under your user account (not root)
+- Use OS-level permissions to control who can access the data directory
+- Protect the configuration directory (`~/.xw/`) with appropriate file permissions
+
+### 3. Model Data Protection
+
+The XW server stores data in:
+
+```
+~/.xw/
+├── config/          # Configuration files
+├── data/            # Runtime data and state
+└── models/          # Downloaded model files
+```
+
+Ensure these directories have appropriate permissions:
+
+```bash
+chmod 700 ~/.xw
+```
+
+### 4. Container Security
+
+When running models in Docker containers:
+
+- The server manages Docker containers on your behalf
+- Containers are automatically isolated by Docker
+- Model files are mounted read-only when possible
+- Each instance uses a unique port allocation
+
+## Production Deployment
+
+If you need to deploy XW in a production environment:
+
+<Warning>
+The current version is designed for local development only. Production deployment requires additional security measures:
+</Warning>
+
+### Required Additions
+
+1. **Authentication Layer**
+   - Add API key authentication
+   - Implement token-based access control
+   - Use OAuth2 or similar for user authentication
+
+2. **TLS/HTTPS**
+   - Enable HTTPS with valid certificates
+   - Use reverse proxy (nginx, Caddy) for TLS termination
+   - Enforce HTTPS-only connections
+
+3. **Rate Limiting**
+   - Implement per-client rate limits
+   - Add concurrency controls per user
+   - Monitor and throttle abusive requests
+
+4. **Audit Logging**
+   - Log all API requests with timestamps
+   - Track model access and usage
+   - Monitor for suspicious activity
+
+5. **Network Security**
+   - Deploy behind a firewall
+   - Use VPN for remote access
+   - Implement IP whitelisting
+
+## Alternative: Using SSH Tunneling
+
+For secure remote access without modifying XW:
+
+```bash
+# On remote server
+xw serve
+
+# On local machine
+ssh -L 11581:localhost:11581 user@remote-server
+
+# Now access via localhost
+curl http://localhost:11581/api/health
+```
+
+This provides:
+- Encrypted communication via SSH
+- Authentication via SSH keys
+- No changes to XW configuration
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="API Overview" icon="book" href="/api/overview">
+    Learn about the API structure
+  </Card>
+  <Card title="Configuration" icon="gear" href="/api/endpoints/config">
+    Configure server settings
+  </Card>
+</CardGroup>

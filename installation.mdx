@@ -1,0 +1,346 @@
+---
+title: Installation
+description: Install XW CLI on your Linux system
+---
+
+XW CLI provides multiple installation methods to suit different use cases. Choose the method that best fits your needs.
+
+## Prerequisites
+
+Before installing XW CLI, ensure your system meets the following requirements:
+
+<Warning>
+  XW CLI requires a Linux system with supported AI accelerator hardware.
+</Warning>
+
+### System Requirements
+
+- **Operating System**: Linux (x86_64 or aarch64/arm64)
+- **AI Accelerator**: Supported domestic AI chip (see [supported hardware](https://xw.tsingmao.com/hardware.html))
+- **Driver**: Proper accelerator driver installed and configured
+- **Tools**: `curl` and `tar` for quick installation
+
+### Verify Hardware Support
+
+Check if your system has a supported AI accelerator:
+
+```bash
+lspci | grep -i accelerator
+```
+
+For the complete list of supported chips, visit the [hardware compatibility page](https://xw.tsingmao.com/hardware.html) or run `xw device supported` after installation.
+
+## Installation Methods
+
+<CardGroup cols={2}>
+  <Card title="Quick Install" icon="bolt" href="#quick-installation-recommended">
+    One-line installation using curl (recommended for most users)
+  </Card>
+  <Card title="Manual Install" icon="wrench" href="#manual-installation">
+    Build from source for development or custom setups
+  </Card>
+</CardGroup>
+
+## Quick Installation (Recommended)
+
+The quick installation script automatically detects your system architecture and installs XW CLI to your user directory.
+
+<Steps>
+  <Step title="Run the installation script">
+    Execute the following command in your terminal:
+
+    ```bash
+    curl -o- http://xw.tsingmao.com/install.sh | bash
+    ```
+
+    Or use the alternative format:
+
+    ```bash
+    curl -fsSL http://xw.tsingmao.com/install.sh | bash
+    ```
+
+    This will:
+    - Detect your system architecture (amd64 or arm64)
+    - Download the latest XW CLI package
+    - Extract and install to `~/.local/bin/xw`
+    - Create configuration directories in `~/.xw/`
+    - Set up your PATH automatically
+  </Step>
+
+  <Step title="Reload your shell configuration">
+    After installation, reload your shell to update the PATH:
+
+    ```bash
+    # For bash users
+    source ~/.bashrc
+
+    # For zsh users
+    source ~/.zshrc
+    ```
+
+    Or simply open a new terminal window.
+  </Step>
+
+  <Step title="Verify the installation">
+    Check that XW CLI is installed correctly:
+
+    ```bash
+    xw version
+    ```
+
+    Expected output:
+    ```
+    Client Version:
+      Version:    1.0.0
+      Build Time: 2026-03-05T10:30:00Z
+    ```
+  </Step>
+</Steps>
+
+<Note>
+  The quick installation installs to your user directory (`~/.local/bin`) and does not require root privileges.
+</Note>
+
+## Manual Installation
+
+For development or when you need more control over the installation process, you can build and install XW CLI manually from source.
+
+### Prerequisites for Manual Installation
+
+- Go 1.21 or later
+- Make
+- Git
+
+### Building from Source
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/TsingmaoAI/xw-cli.git
+    cd xw-cli
+    ```
+  </Step>
+
+  <Step title="Build the binary">
+    ```bash
+    make build
+    ```
+
+    This creates the `xw` binary in the `bin/` directory.
+  </Step>
+
+  <Step title="Choose installation type">
+    You can install XW CLI either for your user only or system-wide.
+
+    <CodeGroup>
+      ```bash User Installation (No Root Required)
+      make install-user
+      ```
+
+      ```bash System-Wide Installation
+      sudo make install
+      ```
+    </CodeGroup>
+  </Step>
+</Steps>
+
+### User Installation Details
+
+User installation (via `make install-user`) installs to:
+
+- **Binary**: `~/.local/bin/xw`
+- **Configuration**: `~/.xw/`
+- **Data**: `~/.xw/data/`
+- **Models**: `~/.xw/data/models/`
+
+After installation:
+
+```bash
+# Ensure ~/.local/bin is in your PATH
+export PATH="$HOME/.local/bin:$PATH"
+
+# Add to your shell configuration file
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+```
+
+### System-Wide Installation Details
+
+System installation (via `sudo make install`) installs to:
+
+- **Binary**: `/usr/local/bin/xw`
+- **Configuration**: `/etc/xw/`
+- **Data**: `/var/lib/xw/`
+- **Logs**: `/var/log/xw/`
+- **Systemd service**: `/etc/systemd/system/xw-server.service`
+
+<Note>
+  System-wide installation creates a dedicated `xw` system user for running the service.
+</Note>
+
+After system installation, you can manage the service:
+
+```bash
+# Start the service
+sudo systemctl start xw-server
+
+# Enable on boot
+sudo systemctl enable xw-server
+
+# Check status
+sudo systemctl status xw-server
+
+# View logs
+sudo journalctl -u xw-server -f
+```
+
+## Configuration
+
+XW CLI uses configuration files stored in version-specific directories:
+
+- `devices.yaml` - Supported AI accelerator definitions
+- `models.yaml` - Available model configurations
+- `runtime_params.yaml` - Runtime parameter settings
+
+These files are automatically downloaded when you first start the server or run `xw update`.
+
+### Configuration Locations
+
+<CodeGroup>
+  ```bash User Installation
+  ~/.xw/<version>/devices.yaml
+  ~/.xw/<version>/models.yaml
+  ~/.xw/<version>/runtime_params.yaml
+  ```
+
+  ```bash System Installation
+  /etc/xw/<version>/devices.yaml
+  /etc/xw/<version>/models.yaml
+  /etc/xw/<version>/runtime_params.yaml
+  ```
+</CodeGroup>
+
+## Updating Configuration
+
+XW CLI supports configuration versioning. To update to the latest configuration:
+
+```bash
+xw update
+```
+
+This command:
+- Checks for available configuration versions
+- Downloads compatible versions
+- Updates your configuration files
+- Reloads the server automatically
+
+See available versions:
+
+```bash
+xw update --list
+```
+
+## Uninstallation
+
+### Removing User Installation
+
+```bash
+rm -rf ~/.local/bin/xw
+rm -rf ~/.xw
+```
+
+Remove the PATH export from your `~/.bashrc` or `~/.zshrc`.
+
+### Removing System Installation
+
+```bash
+sudo make uninstall
+
+# Optional: Remove data and logs
+sudo rm -rf /var/lib/xw
+sudo rm -rf /var/log/xw
+sudo userdel xw
+```
+
+## Troubleshooting
+
+### Command Not Found
+
+If you get "command not found" after installation:
+
+1. Verify the binary exists:
+   ```bash
+   ls -la ~/.local/bin/xw
+   ```
+
+2. Check your PATH:
+   ```bash
+   echo $PATH | grep -o "$HOME/.local/bin"
+   ```
+
+3. Add to PATH if missing:
+   ```bash
+   export PATH="$HOME/.local/bin:$PATH"
+   echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+   source ~/.bashrc
+   ```
+
+### Port Already in Use
+
+If the default port (11581) is already in use:
+
+```bash
+# Use a different port
+xw serve --port 9090
+```
+
+### No AI Chips Detected
+
+If `xw device list` shows no devices:
+
+1. Verify hardware is installed:
+   ```bash
+   lspci | grep -i accelerator
+   ```
+
+2. Check driver installation:
+   ```bash
+   # Example for Ascend NPU
+   npu-smi info
+   ```
+
+3. Ensure proper permissions for device access
+
+4. Check server logs for detailed error messages:
+   ```bash
+   xw serve -v  # Verbose mode
+   ```
+
+### Configuration Download Fails
+
+If configuration download fails during first run:
+
+1. Check network connectivity:
+   ```bash
+   curl -I https://xw.tsingmao.com
+   ```
+
+2. Manually trigger update:
+   ```bash
+   xw update
+   ```
+
+3. Check available versions:
+   ```bash
+   xw update --list
+   ```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Get started with your first model
+  </Card>
+  <Card title="Device Management" icon="microchip" href="/cli/device">
+    Learn about device detection and management
+  </Card>
+</CardGroup>

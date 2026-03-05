@@ -1,0 +1,352 @@
+---
+title: 'Configuration Management'
+description: 'View and modify server configuration settings'
+---
+
+## GET /api/config/info
+
+Retrieve comprehensive information about the current server configuration.
+
+### Request
+
+```bash
+curl http://localhost:11581/api/config/info
+```
+
+### Response
+
+<ResponseField name="name" type="string" required>
+  Unique server instance identifier (e.g., `"xw-a3f5b2c1"`)
+</ResponseField>
+
+<ResponseField name="registry" type="string" required>
+  Configuration package registry URL
+</ResponseField>
+
+<ResponseField name="config_version" type="string" required>
+  Currently active configuration version (e.g., `"v0.0.2"`)
+</ResponseField>
+
+<ResponseField name="host" type="string" required>
+  Server host address (typically `"localhost"`)
+</ResponseField>
+
+<ResponseField name="port" type="integer" required>
+  Server port number (default: `11581`)
+</ResponseField>
+
+<ResponseField name="config_dir" type="string" required>
+  Path to configuration directory (e.g., `"/home/user/.xw"`)
+</ResponseField>
+
+<ResponseField name="data_dir" type="string" required>
+  Path to data directory (e.g., `"/home/user/.xw/data"`)
+</ResponseField>
+
+### Example Response
+
+```json
+{
+  "name": "xw-a3f5b2c1",
+  "registry": "https://xw.tsingmao.com/packages.json",
+  "config_version": "v0.0.2",
+  "host": "localhost",
+  "port": 11581,
+  "config_dir": "/home/user/.xw",
+  "data_dir": "/home/user/.xw/data"
+}
+```
+
+---
+
+## POST /api/config/set
+
+Update specific configuration values. Changes are immediately persisted to disk.
+
+### Request Body
+
+<ParamField body="key" type="string" required>
+  Configuration key to set: `"registry"`
+</ParamField>
+
+<ParamField body="value" type="string" required>
+  New value for the configuration key
+</ParamField>
+
+### Supported Configuration Keys
+
+<ParamField name="registry" type="string">
+  Configuration package registry URL. Used for downloading and updating config packages.
+</ParamField>
+
+<Note>
+The `name` key cannot be modified as it's tied to running instances and server identity.
+</Note>
+
+### Response
+
+<ResponseField name="message" type="string" required>
+  Success message
+</ResponseField>
+
+### Example Request
+
+```bash
+curl -X POST http://localhost:11581/api/config/set \
+  -H "Content-Type: application/json" \
+  -d '{
+    "key": "registry",
+    "value": "https://custom-registry.example.com/packages.json"
+  }'
+```
+
+### Example Response
+
+```json
+{
+  "message": "Configuration updated successfully"
+}
+```
+
+### Error Responses
+
+```json
+{
+  "error": "server name cannot be modified (it's tied to running instances)",
+  "code": "400"
+}
+```
+
+```json
+{
+  "error": "unsupported configuration key: invalid_key",
+  "code": "400"
+}
+```
+
+---
+
+## POST /api/config/get
+
+Retrieve the value of a specific configuration key.
+
+### Request Body
+
+<ParamField body="key" type="string" required>
+  Configuration key to retrieve
+</ParamField>
+
+### Supported Keys
+
+- `name` - Server instance identifier
+- `registry` - Configuration package registry URL
+- `host` - Server host address
+- `port` - Server port number
+- `config_dir` - Configuration directory path
+- `data_dir` - Data directory path
+
+### Response
+
+<ResponseField name="key" type="string" required>
+  The configuration key that was requested
+</ResponseField>
+
+<ResponseField name="value" type="string" required>
+  Current value of the configuration key
+</ResponseField>
+
+### Example Request
+
+```bash
+curl -X POST http://localhost:11581/api/config/get \
+  -H "Content-Type: application/json" \
+  -d '{"key": "registry"}'
+```
+
+### Example Response
+
+```json
+{
+  "key": "registry",
+  "value": "https://xw.tsingmao.com/packages.json"
+}
+```
+
+---
+
+## POST /api/config/reload
+
+Reload all configuration files from the versioned config directory without restarting the server.
+
+### Use Cases
+
+- Apply configuration updates after version change
+- Refresh device and model definitions
+- Reload runtime parameters
+
+### Request
+
+```bash
+curl -X POST http://localhost:11581/api/config/reload
+```
+
+### Response
+
+<ResponseField name="message" type="string" required>
+  Success message
+</ResponseField>
+
+<ResponseField name="config_version" type="string" required>
+  Configuration version that was reloaded
+</ResponseField>
+
+### Example Response
+
+```json
+{
+  "message": "Configuration reloaded successfully",
+  "config_version": "v0.0.2"
+}
+```
+
+### What Gets Reloaded
+
+This endpoint reloads:
+- `devices.yaml` - Device type definitions
+- `models.yaml` - Model registry and specifications
+- `runtime_params.yaml` - Runtime parameters and defaults
+
+<Note>
+Server-level settings (host, port, storage paths) are NOT reloaded as they require a server restart.
+</Note>
+
+---
+
+## Configuration Files
+
+XW stores configuration in a versioned directory structure:
+
+```
+~/.xw/
+├── server.conf              # Server identity and settings
+├── config/
+│   └── v0.0.2/             # Versioned config package
+│       ├── devices.yaml    # Device definitions
+│       ├── models.yaml     # Model registry
+│       └── runtime_params.yaml
+├── data/
+│   ├── instances.db        # Runtime instance state
+│   └── downloads/          # Download cache
+└── models/                 # Downloaded models
+    └── {model-id}/
+        └── {tag}/
+```
+
+### server.conf
+
+Main server configuration file:
+
+```json
+{
+  "name": "xw-a3f5b2c1",
+  "registry": "https://xw.tsingmao.com/packages.json",
+  "config_version": "v0.0.2"
+}
+```
+
+### Config Package Versioning
+
+XW uses a versioned configuration system:
+
+1. Configuration packages are downloaded from the registry
+2. Each version is stored in `config/{version}/`
+3. The server tracks the active version in `server.conf`
+4. Updates can be applied without server restart via `/api/config/reload`
+
+---
+
+## Integration Examples
+
+### Check Current Configuration
+
+```bash
+#!/bin/bash
+
+RESPONSE=$(curl -s http://localhost:11581/api/config/info)
+
+NAME=$(echo $RESPONSE | jq -r '.name')
+VERSION=$(echo $RESPONSE | jq -r '.config_version')
+REGISTRY=$(echo $RESPONSE | jq -r '.registry')
+
+echo "Server: $NAME"
+echo "Config Version: $VERSION"
+echo "Registry: $REGISTRY"
+```
+
+### Update Registry URL
+
+```python
+import requests
+
+url = "http://localhost:11581/api/config/set"
+payload = {
+    "key": "registry",
+    "value": "https://custom-registry.example.com/packages.json"
+}
+
+response = requests.post(url, json=payload)
+if response.status_code == 200:
+    print("Registry updated successfully")
+    print(response.json())
+else:
+    print(f"Failed to update registry: {response.json()['error']}")
+```
+
+### Reload Configuration After Update
+
+```javascript
+const axios = require('axios');
+
+async function reloadConfig() {
+  try {
+    const response = await axios.post('http://localhost:11581/api/config/reload');
+    console.log('Configuration reloaded:', response.data);
+  } catch (error) {
+    console.error('Failed to reload configuration:', error.response.data);
+  }
+}
+
+reloadConfig();
+```
+
+---
+
+## Error Responses
+
+All configuration endpoints return standardized error responses:
+
+```json
+{
+  "error": "key is required",
+  "code": "400"
+}
+```
+
+### Common Error Codes
+
+- `400` - Invalid request body or unsupported key
+- `405` - Method not allowed
+- `500` - Failed to save or reload configuration
+
+---
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card title="Server Health" icon="heart-pulse" href="/api/endpoints/health">
+    Check server status
+  </Card>
+  <Card title="Runtime API" icon="play" href="/api/endpoints/runtime">
+    Manage model instances
+  </Card>
+</CardGroup>

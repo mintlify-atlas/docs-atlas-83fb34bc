@@ -1,0 +1,263 @@
+---
+title: xw logs
+description: View logs from a model instance
+---
+
+## Usage
+
+```bash
+xw logs ALIAS [flags]
+```
+
+## Description
+
+View logs from a running model instance. By default, shows existing logs and exits. Use `-f` to stream logs in real-time, similar to `tail -f`.
+
+Logs include:
+- Model loading progress
+- Request and response information
+- Error messages and stack traces
+- Performance metrics
+- Backend-specific output
+
+## Arguments
+
+<ParamField path="ALIAS" type="string" required>
+  Alias of the instance to view logs from (found using `xw ps`)
+</ParamField>
+
+## Options
+
+<ParamField path="-f, --follow" type="boolean" default="false">
+  Follow log output (stream logs in real-time)
+</ParamField>
+
+<ParamField path="-v, --verbose" type="boolean" default="false">
+  Enable verbose logging
+</ParamField>
+
+## Examples
+
+### View existing logs
+
+```bash
+xw logs my-model
+```
+
+Shows all existing logs and exits.
+
+### Follow logs in real-time
+
+```bash
+xw logs my-model -f
+```
+
+Streams logs continuously. Press Ctrl+C to stop.
+
+### Follow logs (shorter version)
+
+```bash
+xw logs my-model -f
+```
+
+Same as above with the `-f` flag.
+
+## Output
+
+### Model loading logs
+
+```
+2024-03-05 10:15:23 INFO: Loading model qwen2.5-7b-instruct
+2024-03-05 10:15:24 INFO: Initializing vLLM engine
+2024-03-05 10:15:30 INFO: Loading weights from /data/models/qwen2.5-7b-instruct
+2024-03-05 10:16:45 INFO: Model loaded successfully
+2024-03-05 10:16:45 INFO: Server started on port 8001
+2024-03-05 10:16:45 INFO: Ready to accept requests
+```
+
+### Request logs
+
+```
+2024-03-05 10:20:15 INFO: POST /v1/chat/completions
+2024-03-05 10:20:15 INFO: Processing request with 3 messages
+2024-03-05 10:20:18 INFO: Generated 156 tokens in 3.2s (48.75 tokens/s)
+2024-03-05 10:20:18 INFO: Request completed successfully
+```
+
+### Error logs
+
+```
+2024-03-05 10:25:30 ERROR: Out of memory error
+2024-03-05 10:25:30 ERROR: Failed to allocate 8GB for model weights
+2024-03-05 10:25:30 ERROR: Available GPU memory: 4GB
+2024-03-05 10:25:30 ERROR: Instance entering error state
+```
+
+## Following Logs
+
+When using `-f` flag:
+
+```bash
+xw logs my-model -f
+```
+
+Logs will stream continuously:
+
+```
+2024-03-05 10:30:00 INFO: Request received
+2024-03-05 10:30:02 INFO: Processing...
+2024-03-05 10:30:05 INFO: Response sent
+[streaming, press Ctrl+C to exit]
+```
+
+Press **Ctrl+C** to stop following and return to the shell.
+
+## Common Use Cases
+
+### Debugging startup issues
+
+```bash
+# Start an instance
+xw start qwen2-7b --alias debug-test
+
+# Immediately follow logs to see startup process
+xw logs debug-test -f
+```
+
+### Monitoring performance
+
+```bash
+xw logs production -f | grep "tokens/s"
+```
+
+Filters logs to show only token generation speed.
+
+### Investigating errors
+
+```bash
+# Check instance status
+xw ps
+
+# View logs if instance is in error state
+xw logs failed-instance
+
+# Look for ERROR lines
+xw logs failed-instance | grep ERROR
+```
+
+### Watching request activity
+
+```bash
+xw logs api-server -f | grep "POST"
+```
+
+Shows only incoming API requests.
+
+## Log Levels
+
+Logs include different severity levels:
+
+- **INFO**: Normal operational messages
+- **WARNING**: Warning messages (non-critical issues)
+- **ERROR**: Error messages (failures)
+- **DEBUG**: Detailed debugging information (only with `-v` flag)
+
+## Finding Instance Aliases
+
+Use `xw ps` to list all instances:
+
+```bash
+xw ps
+```
+
+Output:
+```
+ALIAS         MODEL                   ENGINE          LOCAL PORT   CONTAINER ID   STATE    UPTIME
+my-model      qwen2.5-7b-instruct    vllm:docker     8001         a1b2c3d4e5f6   ready    2h
+test          qwen2-0.5b             mindie:native   8002         -              ready    15m
+```
+
+Then view logs for the desired instance:
+
+```bash
+xw logs my-model
+```
+
+## Keyboard Shortcuts
+
+- **Ctrl+C**: Stop following logs (when using `-f`)
+- **Ctrl+D**: Exit (alternative to Ctrl+C)
+
+## Error Handling
+
+### Instance not found
+
+```
+failed to get logs: instance not found: my-model
+```
+
+Verify the instance exists:
+
+```bash
+xw ps
+```
+
+### Cannot connect to instance
+
+```
+failed to stream logs: connection refused
+```
+
+The instance may have stopped. Check with:
+
+```bash
+xw ps -a
+```
+
+## Tips
+
+### Save logs to a file
+
+```bash
+xw logs my-model > logs.txt
+```
+
+### Follow and save logs simultaneously
+
+```bash
+xw logs my-model -f | tee logs.txt
+```
+
+### Filter logs by time
+
+```bash
+xw logs my-model | grep "2024-03-05 10:3"
+```
+
+Shows only logs from 10:30-10:39.
+
+### Count error occurrences
+
+```bash
+xw logs my-model | grep ERROR | wc -l
+```
+
+### View last N lines
+
+```bash
+xw logs my-model | tail -n 50
+```
+
+Shows the last 50 log lines.
+
+## Related Commands
+
+- [`xw ps`](/cli/ps) - List running instances
+- [`xw start`](/cli/start) - Start a model instance
+- [`xw stop`](/cli/stop) - Stop an instance
+- [`xw run`](/cli/run) - Run a model with interactive chat
+
+## See Also
+
+- [Troubleshooting](/guides/troubleshooting) - Common issues and solutions
+- [Runtime API](/api/endpoints/runtime) - Access logs via API

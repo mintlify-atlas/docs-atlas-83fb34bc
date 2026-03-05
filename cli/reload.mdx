@@ -1,0 +1,155 @@
+---
+title: xw reload
+description: Reload server configuration
+---
+
+Reload all configuration files without restarting the server. This is useful after updating configuration versions.
+
+## Synopsis
+
+```bash
+xw reload
+```
+
+## Description
+
+The `reload` command triggers the server to reload all configuration files without requiring a restart. This allows configuration changes to take effect immediately.
+
+Configuration files reloaded:
+- `devices.yaml` - Device and runtime images configuration
+- `models.yaml` - Model definitions and deployment configurations
+- `runtime_params.yaml` - Runtime parameter templates
+
+The server will reload the configuration from the current version directory (e.g., `~/.xw/v0.0.2/`).
+
+## When to Use
+
+Use `xw reload` after:
+
+- Running `xw update` to apply new configuration versions
+- Manually editing configuration files
+- Switching configuration versions
+- Making changes to device or model definitions
+
+<Note>
+  After running `xw update`, the configuration is automatically reloaded. You only need to run `xw reload` manually if:
+  - Auto-reload failed after update
+  - You manually edited configuration files
+  - You want to force a configuration refresh
+</Note>
+
+## Examples
+
+### Reload configuration after update
+
+```bash
+xw update
+xw reload
+```
+
+```
+✓ Configuration reloaded successfully
+```
+
+### Reload after manual configuration changes
+
+After editing `~/.xw/v0.0.2/models.yaml`:
+
+```bash
+xw reload
+```
+
+```
+✓ Configuration reloaded successfully
+```
+
+### Handle reload failure
+
+If the server is not running:
+
+```bash
+xw reload
+```
+
+```
+Error: failed to reload configuration: connection refused
+```
+
+You'll need to start the server:
+
+```bash
+sudo systemctl start xw-server
+```
+
+## What Gets Reloaded
+
+### devices.yaml
+
+Device type definitions and runtime container images. Changes include:
+- New device types (e.g., adding support for new AI chips)
+- Updated Docker images for inference engines
+- Device detection rules (PCI IDs, vendor IDs)
+
+### models.yaml
+
+Model definitions and deployment configurations. Changes include:
+- New model definitions
+- Updated model file paths
+- Modified deployment parameters
+- Changed backend preferences
+
+### runtime_params.yaml
+
+Runtime parameter templates for inference engines. Changes include:
+- New parameter templates
+- Updated default values
+- Modified parameter constraints
+
+## Configuration Version Directory
+
+The reload command uses the current configuration version set in the server. To see your current version:
+
+```bash
+xw config get config_dir
+xw update --show-current
+```
+
+Configuration files are loaded from:
+```
+~/.xw/<version>/devices.yaml
+~/.xw/<version>/models.yaml
+~/.xw/<version>/runtime_params.yaml
+```
+
+## Reload vs Restart
+
+### xw reload
+
+- Reloads configuration files only
+- Running instances are **not** affected
+- No downtime
+- Fast (milliseconds)
+- Use when: Configuration files changed
+
+### Server restart
+
+```bash
+sudo systemctl restart xw-server
+```
+
+- Restarts entire server process
+- Running instances are **stopped**
+- Brief downtime during restart
+- Slower (seconds)
+- Use when: Server binary updated, or major configuration changes
+
+<Warning>
+  Reloading configuration does **not** affect running model instances. If you've changed model deployment parameters, you'll need to stop and restart the affected instances for changes to take effect.
+</Warning>
+
+## See Also
+
+- [xw update](/cli/update) - Update configuration versions
+- [xw config](/cli/config) - View configuration settings
+- [xw start](/cli/start) - Start model instances
+- [xw ps](/cli/ps) - List running instances

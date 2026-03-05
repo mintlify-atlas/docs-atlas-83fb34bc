@@ -1,0 +1,714 @@
+---
+title: 'Docker Container Deployment'
+description: 'Understand XW Docker runtime architecture and container-based model deployment'
+icon: 'docker'
+---
+
+## Overview
+
+XW uses Docker containers as the runtime environment for model inference. This architecture provides:
+
+- **Isolation**: Each model instance runs in its own container with dedicated resources
+- **Device Access**: Containers have passthrough access to AI accelerators (NPUs, GPUs)
+- **Reproducibility**: Container images ensure consistent environments across deployments
+- **Scalability**: Multiple model instances can run concurrently with resource limits
+
+<Info>
+XW doesn't run *inside* Docker - it manages Docker containers as inference runtimes. The XW server runs on the host and orchestrates containerized model instances.
+</Info>
+
+## Architecture
+
+### Runtime Container Design
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                      Host System                        │
+│                                                         │
+│  ┌──────────────┐                                      │
+│  │  XW Server   │  (Port 7777)                         │
+│  │              │                                       │
+│  │  Manages:    │                                       │
+│  │  - API       │                                       │
+│  │  - Lifecycle │                                       │
+│  │  - Proxy     │                                       │
+│  └───────┬──────┘                                       │
+│          │                                              │
+│          │ Docker API                                   │
+│          ▼                                              │
+│  ┌───────────────────────────────────────────────┐    │
+│  │           Docker Engine                        │    │
+│  │                                                 │    │
+│  │  ┌─────────────────┐  ┌─────────────────┐     │    │
+│  │  │  vLLM Container │  │ MindIE Container│     │    │
+│  │  │                 │  │                 │     │    │
+│  │  │  Model: Qwen   │  │  Model: Llama3  │     │    │
+│  │  │  Port: 8001    │  │  Port: 8002     │     │    │
+│  │  │  Devices: 0,1  │  │  Devices: 2,3   │     │    │
+│  │  │                 │  │                 │     │    │
+│  │  │  /dev/davinci0 │  │  /dev/davinci2  │     │    │
+│  │  │  /dev/davinci1 │  │  /dev/davinci3  │     │    │
+│  │  └─────────────────┘  └─────────────────┘     │    │
+│  └───────────────────────────────────────────────┘    │
+│                                                         │
+│  /var/lib/xw/models/  (Bind mounted to containers)    │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Container Lifecycle
+
+<Steps>
+  <Step title="Container Creation">
+    When starting a model instance, XW:
+    1. Selects appropriate runtime (vLLM, MindIE, etc.)
+    2. Chooses device-specific Docker image
+    3. Prepares device configuration (sandboxing)
+    4. Creates container with proper mounts and devices
+  </Step>
+
+  <Step title="Container Start">
+    The container starts with:
+    - Model files mounted at `/mnt/model`
+    - Device access configured via environment variables
+    - Inference engine serving on port 8000 (internal)
+    - Port mapped to host for API access
+  </Step>
+
+  <Step title="Running State">
+    While running:
+    - XW proxies requests to container port
+    - Container logs accessible via `xw logs` or `docker logs`
+    - Health checks verify inference readiness
+    - Automatic restart on failure (configurable)
+  </Step>
+
+  <Step title="Container Stop/Remove">
+    When stopping:
+    - Graceful shutdown (30s timeout)
+    - Container preserved for inspection
+    - Explicit removal cleans up resources
+    - Port allocation released
+  </Step>
+</Steps>
+
+## Docker Runtime Types
+
+XW supports multiple inference engines, each with its own runtime implementation:
+
+<CardGroup cols={2}>
+  <Card title="vLLM Runtime" icon="v">
+    **Type**: `vllm:docker`
+    
+    High-performance inference engine with PagedAttention. Supports mainstream LLMs with optimizations for throughput.
+    
+    **Image**: Configured per device type in `runtime_images.yaml`
+  </Card>
+  
+  <Card title="MindIE Runtime" icon="brain">
+    **Type**: `mindie:docker`
+    
+    Huawei's inference engine optimized for Ascend NPUs. Provides native support for CANN acceleration.
+    
+    **Image**: Device-specific MindIE images
+  </Card>
+  
+  <Card title="MLGuider Runtime" icon="compass">
+    **Type**: `mlguider:docker`
+    
+    Specialized runtime for guided generation and structured outputs.
+    
+    **Image**: Configured based on device capabilities
+  </Card>
+  
+  <Card title="Omni-Infer Runtime" icon="circle-nodes">
+    **Type**: `omni-infer:docker`
+    
+    Multi-modal inference runtime supporting vision and language models.
+    
+    **Image**: Device and architecture-specific
+  </Card>
+</CardGroup>
+
+## Volume Mounts
+
+### Standard Mounts
+
+Every container includes these mounts:
+
+```yaml
+Volumes:
+  # Model files (read-only)
+  - Source: /var/lib/xw/models/<model-id>
+    Target: /mnt/model
+    ReadOnly: true
+  
+  # Model cache (read-write)
+  - Source: /root/.cache
+    Target: /root/.cache
+    ReadOnly: false
+```
+
+### Device-Specific Mounts
+
+Additional mounts vary by device type (configured in `devices.yaml`):
+
+<Tabs>
+  <Tab title="Ascend NPU">
+    ```yaml
+    # Driver libraries
+    /usr/local/Ascend: /usr/local/Ascend
+    
+    # Management tools
+    /usr/local/bin/npu-smi: /usr/local/bin/npu-smi
+    
+    # Device management interface
+    /usr/local/dcmi: /usr/local/dcmi
+    ```
+  </Tab>
+  
+  <Tab title="MetaX NPU">
+    ```yaml
+    # MetaX SDK
+    /usr/local/metax: /usr/local/metax
+    
+    # Management utilities
+    /usr/local/bin/metax-smi: /usr/local/bin/metax-smi
+    ```
+  </Tab>
+  
+  <Tab title="Custom Device">
+    Define custom mounts in `devices.yaml`:
+    
+    ```yaml
+    runtime_sandboxes:
+      - config_keys:
+          - custom-device
+        engines:
+          - vllm
+        additional_mounts:
+          /opt/device-sdk: /opt/device-sdk
+          /dev/custom-device: /dev/custom-device
+    ```
+  </Tab>
+</Tabs>
+
+### Cache Directory
+
+The `/root/.cache` mount enables:
+- Model download caching
+- Kernel compilation caching
+- Runtime optimization artifacts
+
+<Warning>
+Ensure sufficient disk space in cache directory. Compiled kernels and model artifacts can consume significant storage.
+</Warning>
+
+## Device Passthrough
+
+### Device Access Configuration
+
+Containers need direct access to AI accelerators. XW handles this via device sandboxing:
+
+```go
+// Sandbox prepares device-specific configuration
+sandbox.GetDeviceMounts(devices) -> ["/dev/davinci0", "/dev/davinci1"]
+
+// Mapped to container with rwm permissions
+Devices:
+  - PathOnHost: /dev/davinci0
+    PathInContainer: /dev/davinci0
+    CgroupPermissions: rwm  # read, write, mknod
+```
+
+### Environment Variables
+
+Device visibility is controlled via environment variables:
+
+<Tabs>
+  <Tab title="Ascend NPU">
+    ```bash
+    ASCEND_RT_VISIBLE_DEVICES=0,1,2,3
+    ASCEND_SLOG_PRINT_TO_STDOUT=1
+    DEVICE_INDEX=0
+    RANK_TABLE_FILE=/mnt/rank_table.json
+    ```
+  </Tab>
+  
+  <Tab title="NVIDIA GPU">
+    ```bash
+    CUDA_VISIBLE_DEVICES=0,1,2,3
+    NVIDIA_VISIBLE_DEVICES=0,1,2,3
+    ```
+  </Tab>
+  
+  <Tab title="Generic">
+    ```bash
+    # Model configuration
+    MODEL_PATH=/mnt/model
+    MODEL_NAME=qwen-7b
+    
+    # Parallelism
+    TENSOR_PARALLEL=2
+    WORLD_SIZE=4
+    ```
+  </Tab>
+</Tabs>
+
+### Privileged Mode
+
+Some device types require privileged containers:
+
+```yaml
+Privileged: true  # Required for certain NPU operations
+```
+
+<Warning>
+Privileged mode grants extensive permissions. Only enable when required by device drivers.
+</Warning>
+
+Alternatively, use specific capabilities:
+
+```yaml
+Capabilities:
+  - SYS_ADMIN
+  - SYS_RAWIO
+  - IPC_LOCK
+```
+
+## Container Images
+
+### Image Selection
+
+XW automatically selects images based on:
+1. **Device type**: Ascend, MetaX, NVIDIA, etc.
+2. **Inference engine**: vLLM, MindIE, MLGuider
+3. **Architecture**: ARM64 or AMD64
+
+Configuration in `configs/runtime_images.yaml`:
+
+```yaml
+runtime_images:
+  ascend-910b:
+    vllm:
+      arm64: quay.io/ascend/vllm-ascend:v0.11.0rc0
+      amd64: quay.io/ascend/vllm-ascend:v0.11.0rc0-x86
+    mindie:
+      arm64: registry.example.com/mindie:latest-arm64
+      amd64: registry.example.com/mindie:latest-amd64
+```
+
+### Custom Images
+
+Override the default image per instance:
+
+```bash
+# Via CLI
+xw start qwen-7b --image custom/vllm:latest
+
+# Via API
+curl -X POST http://localhost:7777/api/runtime/start \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model_name": "qwen-7b",
+    "alias": "my-instance",
+    "image": "custom/vllm:latest"
+  }'
+```
+
+### Image Pull
+
+XW automatically pulls missing images:
+
+```
+Checking Docker image availability...
+Docker image not found locally
+Pulling Docker image: quay.io/ascend/vllm-ascend:v0.11.0rc0
+[=========>        ] 45% (Layer 3/7)
+Successfully pulled image
+```
+
+<Note>
+Image pulls can be slow for large images. Pre-pull images during deployment:
+```bash
+docker pull quay.io/ascend/vllm-ascend:v0.11.0rc0
+```
+</Note>
+
+## Container Configuration
+
+### Port Mapping
+
+Each container exposes port 8000 internally, mapped to a unique host port:
+
+```yaml
+ExposedPorts:
+  8000/tcp: {}
+
+PortBindings:
+  8000/tcp:
+    - HostIP: 127.0.0.1    # Localhost only for security
+      HostPort: "8001"     # Unique per instance
+```
+
+XW automatically allocates ports from configurable range (default: 8001-9000).
+
+### Resource Limits
+
+Configure container resource limits:
+
+```yaml
+Resources:
+  Memory: 32GB           # Maximum memory
+  MemorySwap: 40GB       # Memory + swap limit
+  NanoCPUs: 16000000000  # 16 CPUs (16 * 1e9)
+  DeviceRequests:        # GPU/NPU requests
+    - Capabilities: ["gpu", "compute"]
+      Count: 2
+```
+
+### Shared Memory
+
+Inference workloads require adequate shared memory:
+
+```yaml
+ShmSize: 16GB  # Default for vLLM
+```
+
+Adjust based on model size and batch size. Insufficient shm causes:
+```
+RuntimeError: unable to open shared memory object
+```
+
+### Restart Policy
+
+Containers use `no` restart policy by default:
+
+```yaml
+RestartPolicy:
+  Name: no  # Lifecycle managed by XW
+```
+
+XW server handles instance recovery after crashes.
+
+## Container Labels
+
+XW tags containers with metadata labels:
+
+```yaml
+Labels:
+  xw.runtime: "vllm:docker"
+  xw.model_id: "qwen-7b"
+  xw.alias: "qwen-prod"
+  xw.instance_id: "inst-abc123"
+  xw.backend_type: "vllm"
+  xw.deployment_mode: "docker"
+  xw.device_indices: "0,1"
+  xw.server_name: "xw-node-1"
+  xw.max_concurrent: "100"
+```
+
+These enable:
+- Container discovery after restarts
+- Multi-server deployments
+- Resource tracking
+- Debugging and troubleshooting
+
+## Security Considerations
+
+### Container Isolation
+
+<CardGroup cols={2}>
+  <Card title="Network Isolation" icon="network-wired">
+    Containers use bridge networking with localhost-only port binding by default.
+  </Card>
+  
+  <Card title="Read-Only Mounts" icon="lock">
+    Model files and system libraries mounted read-only to prevent tampering.
+  </Card>
+  
+  <Card title="User Namespace" icon="user-shield">
+    Consider enabling Docker user namespace remapping for additional isolation.
+  </Card>
+  
+  <Card title="Resource Limits" icon="gauge">
+    Set memory and CPU limits to prevent resource exhaustion attacks.
+  </Card>
+</CardGroup>
+
+### Docker Socket Security
+
+XW requires Docker socket access (`/var/run/docker.sock`). Secure this access:
+
+```bash
+# Restrict socket permissions
+sudo chmod 660 /var/run/docker.sock
+sudo chown root:docker /var/run/docker.sock
+
+# Add xw user to docker group
+sudo usermod -aG docker xw
+```
+
+<Warning>
+Docker socket access is equivalent to root access. Consider Docker API authentication for production deployments.
+</Warning>
+
+### Image Trust
+
+Verify image integrity:
+
+```bash
+# Enable Docker Content Trust
+export DOCKER_CONTENT_TRUST=1
+
+# Verify image signatures
+docker trust inspect quay.io/ascend/vllm-ascend:v0.11.0rc0
+```
+
+### Secrets Management
+
+Avoid passing secrets via environment variables. Use:
+- Docker secrets
+- Mounted secret files (read-only)
+- External secret management (Vault, etc.)
+
+## Container Operations
+
+### List Containers
+
+```bash
+# Via XW
+xw ps
+
+# Via Docker
+docker ps -f "label=xw.runtime"
+
+# Show all (including stopped)
+xw ps --all
+docker ps -a -f "label=xw.runtime"
+```
+
+### Inspect Container
+
+```bash
+# Get container details
+xw show <instance-alias>
+
+# Docker inspect
+docker inspect <container-id>
+
+# View container logs
+xw logs <instance-alias>
+docker logs <container-id>
+```
+
+### Execute Commands
+
+Debug running containers:
+
+```bash
+# Get container ID
+CONTAINER_ID=$(docker ps -f "label=xw.alias=qwen-prod" -q)
+
+# Interactive shell
+docker exec -it $CONTAINER_ID /bin/bash
+
+# Check device access
+docker exec $CONTAINER_ID npu-smi info
+
+# View processes
+docker exec $CONTAINER_ID ps aux
+```
+
+### Stop and Remove
+
+```bash
+# Stop instance (preserves container)
+xw stop <instance-alias>
+
+# Remove container
+xw remove <instance-alias>
+
+# Force remove running instance
+xw remove <instance-alias> --force
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Container fails to start">
+    Check container logs:
+    ```bash
+    xw logs <instance-alias>
+    docker logs <container-id>
+    ```
+    
+    Common issues:
+    - **Image not found**: Pull the image manually
+    - **Port conflict**: Check with `netstat -tlnp`
+    - **Device access**: Verify device mounts with `docker inspect`
+    - **Insufficient memory**: Check `docker stats`
+  </Accordion>
+
+  <Accordion title="Device not accessible in container">
+    Verify device passthrough:
+    ```bash
+    # Check device files
+    docker exec <container-id> ls -l /dev/davinci*
+    
+    # Check environment variables
+    docker exec <container-id> env | grep ASCEND
+    
+    # Test device access
+    docker exec <container-id> npu-smi info
+    ```
+    
+    Fix:
+    - Ensure devices are properly configured in `devices.yaml`
+    - Check privileged mode if required
+    - Verify driver installation on host
+  </Accordion>
+
+  <Accordion title="Container exits immediately">
+    Check exit code and reason:
+    ```bash
+    docker inspect <container-id> --format='{{.State.ExitCode}}: {{.State.Error}}'
+    ```
+    
+    Common causes:
+    - **Exit 137**: OOM killed (increase memory limit)
+    - **Exit 126**: Permission denied (check privileged mode)
+    - **Exit 127**: Command not found (verify image)
+    - **Exit 1**: Application error (check logs)
+  </Accordion>
+
+  <Accordion title="Performance issues">
+    Monitor container resources:
+    ```bash
+    docker stats
+    ```
+    
+    Check:
+    - **CPU throttling**: Increase CPU limit
+    - **Memory pressure**: Increase memory or reduce batch size
+    - **Disk I/O**: Use faster storage for cache directory
+    - **Network latency**: Check container network mode
+  </Accordion>
+
+  <Accordion title="Image pull failures">
+    Debug pull issues:
+    ```bash
+    # Test connectivity
+    docker pull hello-world
+    
+    # Check registry access
+    curl -I https://quay.io/v2/
+    
+    # Authenticate if required
+    docker login quay.io
+    ```
+    
+    Configure registry mirrors if needed:
+    ```json
+    // /etc/docker/daemon.json
+    {
+      "registry-mirrors": ["https://mirror.example.com"]
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Pre-pull Images" icon="download">
+    Pull all required images during deployment to avoid delays during model startup.
+  </Card>
+  
+  <Card title="Monitor Resources" icon="chart-line">
+    Use `docker stats` and XW metrics to track container resource usage.
+  </Card>
+  
+  <Card title="Regular Cleanup" icon="broom">
+    Remove stopped containers and unused images to reclaim disk space.
+  </Card>
+  
+  <Card title="Version Pinning" icon="thumbtack">
+    Pin image versions in production to ensure reproducibility.
+  </Card>
+  
+  <Card title="Log Rotation" icon="arrows-rotate">
+    Configure Docker log rotation to prevent disk exhaustion.
+  </Card>
+  
+  <Card title="Health Checks" icon="heart-pulse">
+    Implement health checks to detect unresponsive containers.
+  </Card>
+</CardGroup>
+
+## Advanced Configuration
+
+### Custom Docker Runtime
+
+Specify alternative Docker runtime (e.g., NVIDIA runtime):
+
+```yaml
+# devices.yaml
+runtime_sandboxes:
+  - config_keys:
+      - nvidia-a100
+    engines:
+      - vllm
+    docker_runtime: nvidia
+```
+
+### Network Configuration
+
+Custom network modes:
+
+```bash
+# Create custom network
+docker network create xw-network
+
+# Configure XW to use it (requires code modification)
+# NetworkMode: "xw-network"
+```
+
+### Registry Authentication
+
+Configure private registry access:
+
+```bash
+# Login to registry
+docker login registry.example.com
+
+# Or use config file
+cat > ~/.docker/config.json <<EOF
+{
+  "auths": {
+    "registry.example.com": {
+      "auth": "<base64-encoded-credentials>"
+    }
+  }
+}
+EOF
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="SystemD Deployment" icon="server" href="/deployment/systemd">
+    Deploy XW as a system service
+  </Card>
+  
+  <Card title="Runtime Configuration" icon="sliders" href="/configuration/runtime-params">
+    Configure inference engine parameters
+  </Card>
+  
+  <Card title="Device Configuration" icon="microchip" href="/configuration/devices">
+    Set up device-specific sandboxes
+  </Card>
+  
+  <Card title="Troubleshooting" icon="wrench" href="/guides/troubleshooting">
+    Common issues and solutions
+  </Card>
+</CardGroup>

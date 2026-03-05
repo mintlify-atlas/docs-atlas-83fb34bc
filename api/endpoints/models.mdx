@@ -1,0 +1,365 @@
+---
+title: 'Model Management'
+description: 'List, download, and manage AI models'
+---
+
+## POST /api/models/list
+
+Retrieve a list of available AI models from the registry, with optional filtering by device compatibility.
+
+### Request Body
+
+<ParamField body="device_type" type="DeviceType" optional>
+  Filter models by device compatibility. Examples: `"ascend-910b"`, `"ascend-310p"`, `"all"`
+</ParamField>
+
+<ParamField body="show_all" type="boolean" default="false">
+  Show all models regardless of device compatibility. When `true`, ignores `device_type` filter.
+</ParamField>
+
+### Response
+
+<ResponseField name="models" type="Model[]" required>
+  Array of models matching the request criteria
+</ResponseField>
+
+<ResponseField name="total_models" type="integer" required>
+  Total number of models in the registry
+</ResponseField>
+
+<ResponseField name="available_models" type="integer" required>
+  Number of models available for the current host's devices
+</ResponseField>
+
+<ResponseField name="detected_devices" type="DeviceType[]" required>
+  Device types detected on the current host
+</ResponseField>
+
+### Model Object
+
+<ResponseField name="name" type="string" required>
+  Unique model identifier (e.g., `"qwen2-0.5b"`)
+</ResponseField>
+
+<ResponseField name="description" type="string" required>
+  Human-readable description of the model
+</ResponseField>
+
+<ResponseField name="version" type="string" required>
+  Model version following semantic versioning (e.g., `"1.0.0"`)
+</ResponseField>
+
+<ResponseField name="size" type="integer" required>
+  Total model size in bytes
+</ResponseField>
+
+<ResponseField name="supported_devices" type="DeviceType[]" required>
+  Device types compatible with this model
+</ResponseField>
+
+<ResponseField name="format" type="string" required>
+  Model file format (e.g., `"ONNX"`, `"GGUF"`, `"Paddle"`)
+</ResponseField>
+
+<ResponseField name="status" type="string" required>
+  Download status: `"not_downloaded"`, `"downloading"`, or `"downloaded"`
+</ResponseField>
+
+<ResponseField name="source" type="string" optional>
+  Source ID for downloading (e.g., `"Qwen/Qwen2-0.5B"`). Present for downloaded models.
+</ResponseField>
+
+<ResponseField name="tag" type="string" optional>
+  Model version tag (e.g., `"latest"`). Present for downloaded models.
+</ResponseField>
+
+<ResponseField name="default_engine" type="string" optional>
+  Default inference engine (e.g., `"vllm:docker"`). Present for downloaded models.
+</ResponseField>
+
+<ResponseField name="modified_at" type="string" optional>
+  Last modification time in RFC3339 format. Present for downloaded models.
+</ResponseField>
+
+### Example Request
+
+```bash
+curl -X POST http://localhost:11581/api/models/list \
+  -H "Content-Type: application/json" \
+  -d '{
+    "device_type": "ascend-910b",
+    "show_all": false
+  }'
+```
+
+### Example Response
+
+```json
+{
+  "models": [
+    {
+      "name": "qwen2-0.5b",
+      "description": "Qwen2 0.5B parameter model optimized for Ascend chips",
+      "version": "1.0.0",
+      "size": 1073741824,
+      "supported_devices": ["ascend-910b", "ascend-310p"],
+      "format": "GGUF",
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-03-01T00:00:00Z",
+      "status": "downloaded",
+      "source": "Qwen/Qwen2-0.5B",
+      "tag": "latest",
+      "default_engine": "vllm:docker",
+      "modified_at": "2026-03-05T10:00:00Z"
+    }
+  ],
+  "total_models": 42,
+  "available_models": 15,
+  "detected_devices": ["ascend-910b"]
+}
+```
+
+---
+
+## GET /api/models/downloaded
+
+List models that have been downloaded and are available locally.
+
+### Response
+
+<ResponseField name="models" type="DownloadedModel[]" required>
+  Array of downloaded models
+</ResponseField>
+
+### DownloadedModel Object
+
+<ResponseField name="id" type="string" required>
+  Internal model identifier (e.g., `"qwen2-0.5b"`)
+</ResponseField>
+
+<ResponseField name="source" type="string" required>
+  Source ID used for downloading (e.g., `"Qwen/Qwen2-0.5B"`)
+</ResponseField>
+
+<ResponseField name="tag" type="string" required>
+  Model version tag (e.g., `"latest"`)
+</ResponseField>
+
+<ResponseField name="size" type="number" required>
+  Total size of the model directory in bytes
+</ResponseField>
+
+<ResponseField name="default_engine" type="string" required>
+  Default inference engine (e.g., `"vllm:docker"`)
+</ResponseField>
+
+<ResponseField name="modified" type="string" required>
+  Last modification time in RFC3339 format
+</ResponseField>
+
+### Example Request
+
+```bash
+curl http://localhost:11581/api/models/downloaded
+```
+
+### Example Response
+
+```json
+{
+  "models": [
+    {
+      "id": "qwen2-0.5b",
+      "source": "Qwen/Qwen2-0.5B",
+      "tag": "latest",
+      "size": 1073741824,
+      "default_engine": "vllm:docker",
+      "modified": "2026-03-05T10:00:00Z"
+    },
+    {
+      "id": "llama3-8b",
+      "source": "meta-llama/Meta-Llama-3-8B",
+      "tag": "latest",
+      "size": 16106127360,
+      "default_engine": "vllm:docker",
+      "modified": "2026-03-04T15:30:00Z"
+    }
+  ]
+}
+```
+
+---
+
+## POST /api/models/show
+
+Retrieve detailed information about a specific model.
+
+### Request Body
+
+<ParamField body="model" type="string" required>
+  Model ID to show (e.g., `"qwen2-0.5b"`)
+</ParamField>
+
+### Response
+
+The response includes comprehensive model metadata:
+
+<ResponseField name="model_id" type="string" required>
+  Model identifier
+</ResponseField>
+
+<ResponseField name="parameters" type="number" optional>
+  Number of parameters in billions (e.g., `0.5` for 0.5B)
+</ResponseField>
+
+<ResponseField name="context_length" type="number" optional>
+  Maximum context length in tokens
+</ResponseField>
+
+<ResponseField name="embedding_length" type="number" optional>
+  Embedding dimension size
+</ResponseField>
+
+<ResponseField name="architecture" type="string" required>
+  Model architecture (e.g., `"transformer"`)
+</ResponseField>
+
+<ResponseField name="family" type="string" optional>
+  Model family (e.g., `"qwen2"`)
+</ResponseField>
+
+<ResponseField name="quantization" type="string" optional>
+  Quantization method (e.g., `"Q4"`)
+</ResponseField>
+
+<ResponseField name="capabilities" type="string[]" required>
+  Model capabilities (e.g., `["completion", "chat"]`)
+</ResponseField>
+
+<ResponseField name="license" type="string" optional>
+  Model license information
+</ResponseField>
+
+<ResponseField name="supported_engines" type="object" required>
+  Map of device types to available engines
+</ResponseField>
+
+<ResponseField name="template" type="string" optional>
+  Prompt template for the model
+</ResponseField>
+
+<ResponseField name="system" type="string" optional>
+  Default system prompt
+</ResponseField>
+
+<ResponseField name="inference_parameters" type="object" optional>
+  Default inference parameters (temperature, top_p, etc.)
+</ResponseField>
+
+<ResponseField name="modelfile" type="string" optional>
+  Full Modelfile content if it exists
+</ResponseField>
+
+### Example Request
+
+```bash
+curl -X POST http://localhost:11581/api/models/show \
+  -H "Content-Type: application/json" \
+  -d '{"model": "qwen2-0.5b"}'
+```
+
+### Example Response
+
+```json
+{
+  "model_id": "qwen2-0.5b",
+  "parameters": 0.5,
+  "context_length": 32768,
+  "embedding_length": 896,
+  "architecture": "Qwen2ForCausalLM",
+  "family": "qwen2",
+  "quantization": "Q4",
+  "capabilities": ["completion", "chat"],
+  "license": "Apache-2.0",
+  "supported_engines": {
+    "ascend-910b": ["vllm:docker", "mindie:docker"],
+    "ascend-310p": ["vllm:docker"]
+  },
+  "template": "{{ .System }}\n{{ .Prompt }}",
+  "system": "You are a helpful AI assistant.",
+  "inference_parameters": {
+    "temperature": 0.7,
+    "top_p": 0.9,
+    "top_k": 40,
+    "max_new_tokens": 2048
+  }
+}
+```
+
+---
+
+## POST /api/models/pull
+
+Download a model from the registry. This endpoint supports Server-Sent Events (SSE) for progress updates.
+
+### Request Body
+
+<ParamField body="model" type="string" required>
+  Model name to download (e.g., `"qwen2-0.5b"`)
+</ParamField>
+
+<ParamField body="version" type="string" optional>
+  Specific version to download. If empty, downloads the latest version.
+</ParamField>
+
+### Response (Non-Streaming)
+
+<ResponseField name="status" type="string" required>
+  Pull operation status: `"downloading"`, `"success"`, or `"failed"`
+</ResponseField>
+
+<ResponseField name="progress" type="integer" optional>
+  Download progress percentage (0-100)
+</ResponseField>
+
+<ResponseField name="message" type="string" optional>
+  Status message or error details
+</ResponseField>
+
+### Example Request
+
+```bash
+curl -X POST http://localhost:11581/api/models/pull \
+  -H "Content-Type: application/json" \
+  -d '{"model": "qwen2-0.5b"}'
+```
+
+### Example Response
+
+```json
+{
+  "status": "success",
+  "progress": 100,
+  "message": "Model qwen2-0.5b downloaded successfully"
+}
+```
+
+---
+
+## Error Responses
+
+All model endpoints return standardized error responses:
+
+```json
+{
+  "error": "Model not found: invalid-model",
+  "code": "404"
+}
+```
+
+### Common Error Codes
+
+- `400` - Invalid request body or parameters
+- `404` - Model not found in registry
+- `405` - Method not allowed
+- `500` - Internal server error (failed to read models directory, etc.)

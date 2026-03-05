@@ -1,0 +1,173 @@
+---
+title: xw version
+description: Display version information
+---
+
+Display version information for the xw client and server.
+
+## Synopsis
+
+```bash
+xw version [flags]
+```
+
+## Description
+
+The `version` command displays version information for the xw CLI client and/or the xw server. By default, it shows both client and server versions.
+
+This command is similar to `kubectl version` in Kubernetes.
+
+## Options
+
+<ParamField path="--client" type="boolean" default="false">
+  Show client version only
+</ParamField>
+
+<ParamField path="--server" type="boolean" default="false">
+  Show server version only
+</ParamField>
+
+## Examples
+
+### Show both client and server versions
+
+```bash
+xw version
+```
+
+```
+Client Version:
+  Version:    v0.2.0
+  Build Time: 2024-01-15T10:30:00Z
+
+Server Version:
+  Version:    v0.2.0
+  Build Time: 2024-01-15T10:25:00Z
+```
+
+### Show only client version
+
+```bash
+xw version --client
+```
+
+```
+Client Version:
+  Version:    v0.2.0
+  Build Time: 2024-01-15T10:30:00Z
+```
+
+### Show only server version
+
+```bash
+xw version --server
+```
+
+```
+Server Version:
+  Version:    v0.2.0
+  Build Time: 2024-01-15T10:25:00Z
+```
+
+## Version Information
+
+### Version
+
+The semantic version number (e.g., `v0.2.0`). Both client and server follow semantic versioning:
+
+- **Major version**: Breaking API changes
+- **Minor version**: New features, backwards compatible
+- **Patch version**: Bug fixes, backwards compatible
+
+### Build Time
+
+The timestamp when the binary was built (in RFC3339 format).
+
+## Client-Server Compatibility
+
+The xw CLI client and server versions should generally match. However:
+
+- **Minor version differences** are usually compatible (e.g., client v0.2.0 with server v0.1.5)
+- **Major version differences** may cause issues (e.g., client v1.0.0 with server v0.2.0)
+
+<Warning>
+  If you see API errors or unexpected behavior, check that your client and server versions are compatible. Update the client or server as needed.
+</Warning>
+
+## Development Builds
+
+Development builds show version as `dev`:
+
+```bash
+xw version --client
+```
+
+```
+Client Version:
+  Version:    dev
+  Build Time: unknown
+```
+
+This indicates the binary was built from source without version tags.
+
+## Checking Version in Scripts
+
+To get just the version string for scripting:
+
+```bash
+# Client version only, parse the output
+xw version --client | grep "Version:" | awk '{print $2}'
+```
+
+```
+v0.2.0
+```
+
+## Troubleshooting
+
+### Server version check fails
+
+If the server is not running:
+
+```bash
+xw version
+```
+
+```
+Client Version:
+  Version:    v0.2.0
+  Build Time: 2024-01-15T10:30:00Z
+
+Error: failed to get server version: connection refused
+```
+
+Start the server:
+
+```bash
+sudo systemctl start xw-server
+```
+
+### Version mismatch warnings
+
+If you see unexpected behavior, verify version compatibility:
+
+```bash
+xw version
+```
+
+If versions differ significantly, update the outdated component:
+
+```bash
+# Update client (download new binary)
+wget https://releases.example.com/xw/v0.2.0/xw-linux-amd64
+
+# Update server
+sudo systemctl stop xw-server
+sudo cp xw-server /usr/local/bin/
+sudo systemctl start xw-server
+```
+
+## See Also
+
+- [xw config](/cli/config) - View server configuration
+- [xw update](/cli/update) - Update configuration versions

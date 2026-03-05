@@ -1,0 +1,122 @@
+---
+title: xw device
+description: AI chip device detection and management
+---
+
+Detect and manage AI accelerator devices on the server. This command queries the server to discover domestic AI chips installed on the server machine.
+
+## Synopsis
+
+```bash
+xw device <subcommand>
+```
+
+## Description
+
+The `device` command provides subcommands for detecting and managing AI accelerator hardware on the server system. It allows you to:
+
+- List all detected AI chips on the server
+- View supported chip models in the configuration
+
+## Subcommands
+
+### xw device list
+
+List all detected AI accelerator chips on the server.
+
+```bash
+xw device list
+```
+
+#### Example Output
+
+```
+CHIP KEY  CHIP         #    PCI ADDRESS      VENDOR:DEVICE
+--------  ----         -    -----------      -------------
+ascend    Ascend 910B  0:0  0000:c1:00.0     19e5:d801
+ascend    Ascend 910B  0:1  0000:c1:00.0     19e5:d801
+ascend    Ascend 910B  1:0  0000:c2:00.0     19e5:d801
+ascend    Ascend 910B  1:1  0000:c2:00.0     19e5:d801
+
+Total: 4 AI chip(s) detected (4x ascend)
+```
+
+The `#` column shows the chip index for multi-chip cards in the format `PhysicalDevice:ChipIndex` (e.g., `0:0`, `0:1`). For single-chip devices, this column shows `-`.
+
+### xw device supported
+
+Show all AI chip models supported by the server configuration.
+
+```bash
+xw device supported
+```
+
+#### Example Output
+
+```
+Supported AI chip models:
+  - ascend
+  - kunlun
+  - iluvatar
+
+Total: 3 chip model(s) supported
+```
+
+## Examples
+
+### List all detected devices
+
+```bash
+xw device list
+```
+
+### Check supported chip models
+
+```bash
+xw device supported
+```
+
+### Check if any devices are detected
+
+If no devices are found:
+
+```bash
+xw device list
+```
+
+```
+No AI chips detected on the server.
+
+To see supported chips, run: xw device supported
+```
+
+## Understanding Device Information
+
+### CHIP KEY
+
+The device type identifier used in configuration files (e.g., `ascend`, `kunlun`, `iluvatar`).
+
+### CHIP
+
+The human-readable chip model name (e.g., `Ascend 910B`, `Kunlun R200`).
+
+### # (Chip Index)
+
+For multi-chip cards, shows `PhysicalDevice:ChipIndex` (e.g., `0:0`, `0:1`, `1:0`, `1:1`). This indicates:
+- First number: Physical card index (0, 1, 2, ...)
+- Second number: Chip on that card (0, 1, ...)
+
+For single-chip cards, shows `-`.
+
+### PCI ADDRESS
+
+The PCI bus address where the device is located (e.g., `0000:c1:00.0`).
+
+### VENDOR:DEVICE
+
+The PCI vendor ID and device ID (e.g., `19e5:d801` for Huawei/Ascend).
+
+## See Also
+
+- [xw start](/cli/start) - Start model with specific devices
+- [xw config](/cli/config) - View server configuration

@@ -1,0 +1,388 @@
+---
+title: Supported Models
+description: Complete list of AI models supported by XW CLI with specifications and capabilities
+---
+
+XW CLI supports a wide range of open-source AI models optimized for domestic AI accelerators. Models are pre-configured with device compatibility, engine support, and deployment parameters.
+
+## Model Categories
+
+### Qwen Series
+
+Qwen models from Alibaba Cloud, optimized for various tasks and hardware configurations.
+
+<AccordionGroup>
+  <Accordion title="Qwen2.5 Models" icon="brain">
+    
+    #### Qwen2.5-7B-Instruct
+    - **Model ID**: `qwen2.5-7b-instruct`
+    - **Parameters**: 7.6B
+    - **Context Length**: 131,072 tokens
+    - **Capabilities**: Text completion
+    - **Supported Devices**:
+      - Ascend 910B: vLLM, MindIE
+      - Ascend 310P: vLLM, MindIE, MLGuider
+      - MetaX C550: vLLM
+    
+    #### Qwen2.5-14B-Instruct
+    - **Model ID**: `qwen2.5-14b-instruct`
+    - **Parameters**: 14B
+    - **Context Length**: 131,072 tokens
+    - **Capabilities**: Text completion
+    - **Supported Devices**:
+      - Ascend 910B: vLLM, MindIE, MLGuider
+      - Ascend 310P: vLLM, MindIE, MLGuider
+      - MetaX C550: vLLM
+    
+    #### Qwen2.5-72B-Instruct
+    - **Model ID**: `qwen2.5-72b-instruct`
+    - **Parameters**: 72B
+    - **Context Length**: 131,072 tokens
+    - **Capabilities**: Text completion
+    - **Supported Devices**:
+      - Ascend 910B: vLLM, MindIE, MLGuider
+      - Ascend 310P: vLLM, MindIE, MLGuider
+      - MetaX C550: vLLM
+
+  </Accordion>
+
+  <Accordion title="Qwen3 Models" icon="sparkles">
+    
+    #### Qwen3-8B
+    - **Model ID**: `qwen3-8b`
+    - **Parameters**: 8B
+    - **Context Length**: 131,072 tokens
+    - **Capabilities**: Text completion
+    - **Supported Devices**:
+      - Ascend 910B: vLLM, MindIE
+      - Ascend 310P: vLLM, MindIE, MLGuider
+      - MetaX C550: vLLM
+    
+    #### Qwen3-32B
+    - **Model ID**: `qwen3-32b`
+    - **Parameters**: 32B
+    - **Context Length**: 131,072 tokens
+    - **Capabilities**: Text completion
+    - **Supported Devices**:
+      - Ascend 910B: vLLM, MindIE
+      - Ascend 310P: vLLM, MindIE, MLGuider
+      - MetaX C550: vLLM
+    
+    #### Qwen3-32B-W8A8
+    - **Model ID**: `qwen3-32b-w8a8`
+    - **Parameters**: 32B (quantized)
+    - **Context Length**: 131,072 tokens
+    - **Capabilities**: Text completion
+    - **Quantization**: W8A8 (8-bit weights and activations)
+    - **Supported Devices**:
+      - Ascend 910B: vLLM, MindIE
+
+  </Accordion>
+
+  <Accordion title="Qwen Vision Models" icon="image">
+    
+    #### Qwen2.5-VL-7B-Instruct
+    - **Model ID**: `qwen2.5-vl-7b-instruct`
+    - **Parameters**: 7B
+    - **Context Length**: 32,768 tokens
+    - **Capabilities**: Text completion, vision
+    - **Supported Devices**:
+      - Ascend 910B: vLLM, MindIE, MLGuider
+      - Ascend 310P: vLLM, MindIE
+      - MetaX C550: vLLM
+    
+    #### Qwen3-VL-8B-Instruct
+    - **Model ID**: `qwen3-vl-8b-instruct`
+    - **Parameters**: 8B
+    - **Context Length**: 32,768 tokens
+    - **Capabilities**: Text completion, vision
+    - **Supported Devices**:
+      - Ascend 910B: vLLM, MindIE, MLGuider
+      - Ascend 310P: vLLM, MindIE
+      - MetaX C550: vLLM
+    
+    #### Qwen3-VL-30B-A3B-Instruct
+    - **Model ID**: `qwen3-vl-30b-a3b-instruct`
+    - **Parameters**: 30B
+    - **Context Length**: 32,768 tokens
+    - **Capabilities**: Text completion, vision
+    - **Supported Devices**:
+      - Ascend 910B: vLLM, MindIE
+      - Ascend 310P: vLLM, MindIE
+      - MetaX C550: vLLM
+
+  </Accordion>
+
+  <Accordion title="Qwen Coder Models" icon="code">
+    
+    #### Qwen3-Coder-Next
+    - **Model ID**: `qwen3-coder-next`
+    - **Parameters**: 80B
+    - **Context Length**: 131,072 tokens
+    - **Capabilities**: Text completion, coding, tool use
+    - **Supported Devices**:
+      - Ascend 310P: MLGuider
+
+  </Accordion>
+
+  <Accordion title="Qwen Large Models (Quantized)" icon="microchip">
+    
+    #### Qwen3-235B-A22B-W8A8
+    - **Model ID**: `qwen3-235b-a22b-w8a8`
+    - **Parameters**: 235B
+    - **Context Length**: 40,960 tokens
+    - **Quantization**: W8A8
+    - **Supported Devices**:
+      - MetaX C550: vLLM
+    
+    #### Qwen3-235B-A22B-W4A8
+    - **Model ID**: `qwen3-235b-a22b-w4a8`
+    - **Parameters**: 235B
+    - **Context Length**: 40,960 tokens
+    - **Quantization**: W4A8
+    - **Supported Devices**:
+      - Ascend 910B: vLLM
+    
+    #### Qwen3-Next-80B-A3B-Instruct-W8A8
+    - **Model ID**: `qwen3-next-80b-a3b-instruct-w8a8`
+    - **Parameters**: 80B
+    - **Context Length**: 131,072 tokens
+    - **Quantization**: W8A8
+    - **Supported Devices**:
+      - Ascend 910B: vLLM, MindIE
+    
+    #### Qwen3-30B-A3B-Instruct-2507-W4A8
+    - **Model ID**: `qwen3-30b-a3b-instruct-2507-w4a8`
+    - **Parameters**: 30B
+    - **Context Length**: 131,072 tokens
+    - **Quantization**: W4A8
+    - **Supported Devices**:
+      - Ascend 910B: vLLM, MindIE
+
+  </Accordion>
+</AccordionGroup>
+
+### DeepSeek Series
+
+DeepSeek reasoning models with distilled variants.
+
+<AccordionGroup>
+  <Accordion title="DeepSeek-R1 Distill Models" icon="brain-circuit">
+    
+    #### DeepSeek-R1-Distill-Qwen-7B
+    - **Model ID**: `deepseek-r1-distill-qwen-7b`
+    - **Parameters**: 7B
+    - **Context Length**: 131,072 tokens
+    - **Capabilities**: Text completion
+    - **Supported Devices**:
+      - Ascend 910B: vLLM, MindIE, MLGuider
+      - Ascend 310P: vLLM, MindIE, MLGuider
+      - MetaX C550: vLLM
+    
+    #### DeepSeek-R1-Distill-Qwen-32B
+    - **Model ID**: `deepseek-r1-distill-qwen-32b`
+    - **Parameters**: 32B
+    - **Context Length**: 131,072 tokens
+    - **Capabilities**: Text completion
+    - **Supported Devices**:
+      - Ascend 910B: vLLM, MindIE, MLGuider
+      - Ascend 310P: vLLM, MindIE, MLGuider
+      - MetaX C550: vLLM
+    
+    #### DeepSeek-R1-Distill-Llama-70B
+    - **Model ID**: `deepseek-r1-distill-llama-70b`
+    - **Parameters**: 70B
+    - **Context Length**: 32,768 tokens
+    - **Capabilities**: Text completion
+    - **Supported Devices**:
+      - Ascend 910B: vLLM, MindIE, MLGuider
+      - Ascend 310P: vLLM, MindIE, MLGuider
+      - MetaX C550: vLLM
+
+  </Accordion>
+
+  <Accordion title="DeepSeek Vision Models" icon="eye">
+    
+    #### DeepSeek-OCR
+    - **Model ID**: `deepseek-ocr`
+    - **Context Length**: 32,768 tokens
+    - **Capabilities**: Text completion, vision
+    - **Supported Devices**:
+      - MetaX C550: vLLM
+
+  </Accordion>
+</AccordionGroup>
+
+### GLM Series
+
+GLM models from Zhipu AI, including vision and reasoning variants.
+
+<AccordionGroup>
+  <Accordion title="GLM-4 Models" icon="atom">
+    
+    #### GLM-4.5-W8A8
+    - **Model ID**: `glm-4.5-w8a8`
+    - **Context Length**: 131,072 tokens
+    - **Quantization**: W8A8
+    - **Supported Devices**:
+      - Ascend 910B: vLLM
+      - MetaX C550: vLLM
+    
+    #### GLM-4.7-W8A8
+    - **Model ID**: `glm-4.7-w8a8`
+    - **Context Length**: 131,072 tokens
+    - **Quantization**: W8A8
+    - **Supported Devices**:
+      - MetaX C550: vLLM
+
+  </Accordion>
+
+  <Accordion title="GLM Vision Models" icon="camera">
+    
+    #### GLM-OCR
+    - **Model ID**: `glm-ocr`
+    - **Parameters**: 10B
+    - **Context Length**: 66,000 tokens
+    - **Capabilities**: Text completion, vision
+    - **Supported Devices**:
+      - Ascend 310P: MLGuider
+
+  </Accordion>
+
+  <Accordion title="GLM-5" icon="stars">
+    
+    #### GLM-5
+    - **Model ID**: `glm-5`
+    - **Context Length**: 131,072 tokens
+    - **Quantization**: W4A8
+    - **Supported Devices**:
+      - Ascend 910B: vLLM
+
+  </Accordion>
+</AccordionGroup>
+
+### Other Models
+
+<AccordionGroup>
+  <Accordion title="MiniMax" icon="maximize">
+    
+    #### MiniMax-M2.1-W4A8
+    - **Model ID**: `minimax-m2.1-w4a8`
+    - **Context Length**: 131,072 tokens
+    - **Quantization**: W4A8
+    - **Supported Devices**:
+      - Ascend 910B: vLLM
+
+  </Accordion>
+
+  <Accordion title="QwQ" icon="question">
+    
+    #### QwQ-32B
+    - **Model ID**: `qwq-32b`
+    - **Parameters**: 32B
+    - **Context Length**: 131,072 tokens
+    - **Capabilities**: Text completion
+    - **Supported Devices**:
+      - Ascend 910B: vLLM, MindIE, MLGuider
+      - Ascend 310P: vLLM, MindIE, MLGuider
+      - MetaX C550: vLLM
+
+  </Accordion>
+</AccordionGroup>
+
+## Hardware Support Matrix
+
+### Ascend 910B
+
+High-performance training and inference NPU.
+
+**Supported Engines**: vLLM, MindIE, MLGuider (select models)
+
+**Recommended Models**:
+- Qwen2.5/3 series (7B-72B)
+- Quantized large models (W8A8, W4A8)
+- GLM-4.5, GLM-5
+- DeepSeek-R1 distill series
+
+### Ascend 310P
+
+Cost-effective inference NPU with dual-chip architecture.
+
+**Supported Engines**: vLLM, MindIE, MLGuider
+
+**Recommended Models**:
+- Qwen2.5 series (7B-72B)
+- DeepSeek-R1 distill series
+- Qwen3-Coder-Next (MLGuider only)
+- GLM-OCR (MLGuider only)
+
+### MetaX C550
+
+Domestic GPU alternative with CUDA-compatible interface.
+
+**Supported Engines**: vLLM
+
+**Recommended Models**:
+- Qwen2.5/3 series
+- Qwen3-235B (quantized)
+- GLM-4.5/4.7
+- DeepSeek series
+
+## Capabilities Reference
+
+<CardGroup cols={2}>
+  <Card title="completion" icon="align-left">
+    Standard text generation and completion
+  </Card>
+  <Card title="vision" icon="eye">
+    Image understanding and multimodal input
+  </Card>
+  <Card title="coding" icon="code">
+    Code generation and programming assistance
+  </Card>
+  <Card title="tool_use" icon="wrench">
+    Function calling and external tool integration
+  </Card>
+</CardGroup>
+
+## Quantization Formats
+
+<Info>
+  Quantized models reduce memory usage and increase inference speed with minimal accuracy loss.
+</Info>
+
+- **W8A8**: 8-bit weights and activations (balanced)
+- **W4A8**: 4-bit weights, 8-bit activations (aggressive compression)
+
+## Checking Model Availability
+
+List all models supported by your hardware:
+
+```bash
+xw ls
+```
+
+Filter by device type:
+
+```bash
+xw device list
+```
+
+Check model details:
+
+```bash
+xw show <model-id>
+```
+
+## Model Sources
+
+Models are sourced from:
+- **ModelScope**: Official Alibaba model repository
+- **HuggingFace**: Community model hub
+- **Custom repositories**: Vendor-optimized variants
+
+Model source IDs are specified in `configs/0.0.1/models.yaml` for reference.
+
+<Note>
+  Model availability is automatically filtered based on detected hardware. Only compatible models will appear in `xw ls`.
+</Note>

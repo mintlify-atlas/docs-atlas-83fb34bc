@@ -1,0 +1,121 @@
+---
+title: "Introduction"
+description: "Zero-configuration deployment tool for running large language models on Chinese domestic AI chips"
+---
+
+# Welcome to XW CLI
+
+XW CLI is a command-line tool that enables zero-configuration deployment of large language models on Chinese domestic AI chips, including Huawei Ascend NPUs and other hardware platforms. It eliminates complex environment setup and provides a simple, one-command workflow to run production-grade AI inference.
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Get your first model running in minutes
+  </Card>
+  <Card title="Installation" icon="download" href="/installation">
+    Install XW CLI on your system
+  </Card>
+  <Card title="CLI Reference" icon="terminal" href="/cli/serve">
+    Explore all available commands
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/overview">
+    Integrate with the HTTP API
+  </Card>
+</CardGroup>
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="Domestic Hardware Support" icon="microchip">
+    Deep optimization for Huawei Ascend 910B, 310P, and other Chinese AI chips
+  </Card>
+  <Card title="Multi-Engine Backend" icon="gears">
+    Built-in support for vLLM, MindIE, MLGuider, and Omni-Infer inference engines
+  </Card>
+  <Card title="Zero Configuration" icon="wand-magic-sparkles">
+    Automatic hardware detection and intelligent engine selection
+  </Card>
+  <Card title="OpenAI Compatible" icon="code-compare">
+    Drop-in replacement for OpenAI API endpoints
+  </Card>
+  <Card title="Pre-configured Models" icon="database">
+    Ready-to-use configurations for Qwen, GLM-4, MiniMax, DeepSeek, and more
+  </Card>
+  <Card title="Multi-Device Support" icon="microchip">
+    Tensor parallelism across multiple devices for large models
+  </Card>
+</CardGroup>
+
+## How It Works
+
+XW CLI provides a unified interface to manage the complete lifecycle of AI model deployment:
+
+<Steps>
+  <Step title="Start the Server">
+    Launch the XW HTTP server to manage model instances
+    
+    ```bash
+    xw serve
+    ```
+  </Step>
+  
+  <Step title="Pull a Model">
+    Download pre-configured models from the registry
+    
+    ```bash
+    xw pull qwen3-8b
+    ```
+  </Step>
+  
+  <Step title="Run the Model">
+    Start inference with a single command
+    
+    ```bash
+    xw run qwen3-8b
+    ```
+  </Step>
+</Steps>
+
+## Supported Hardware
+
+XW CLI supports a wide range of domestic AI accelerators:
+
+- **Huawei Ascend Series**: 910B, 910B1, 910B4, 310P
+- **MetaX Series**: C550
+- Extensible architecture for additional hardware platforms
+
+## Supported Models
+
+XW CLI comes with pre-configured support for popular Chinese and international LLMs:
+
+- **Qwen Series**: Qwen2.5, Qwen3 (7B, 8B, 32B, 235B variants)
+- **GLM Series**: GLM-4.7, GLM-OCR
+- **MiniMax**: MiniMax-2.1, MiniMax-2.5
+- **DeepSeek**: DeepSeek-OCR
+- Custom model support through configuration
+
+## Architecture
+
+XW CLI consists of three main components:
+
+1. **CLI Client**: User-facing command-line interface
+2. **HTTP Server**: Model management and API gateway
+3. **Runtime Engines**: Multiple inference backends (vLLM, MindIE, MLGuider, Omni-Infer)
+
+The server automatically detects available hardware, selects the optimal inference engine, and manages Docker-based runtime isolation for each model instance.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Installation Guide" icon="download" href="/installation">
+    Install XW CLI and verify hardware support
+  </Card>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Run your first model in 5 minutes
+  </Card>
+  <Card title="Architecture Overview" icon="sitemap" href="/concepts/architecture">
+    Learn how XW CLI works under the hood
+  </Card>
+  <Card title="Configuration" icon="gear" href="/configuration/overview">
+    Customize models, devices, and runtime parameters
+  </Card>
+</CardGroup>

@@ -1,0 +1,184 @@
+---
+title: xw config
+description: Manage server configuration
+---
+
+Manage xw server configuration settings. View and modify server configuration values such as the server name and registry URL.
+
+## Synopsis
+
+```bash
+xw config <subcommand> [flags]
+```
+
+## Description
+
+The `config` command group allows you to view and modify server configuration values. All configuration changes are immediately persisted and take effect without requiring a server restart.
+
+## Subcommands
+
+### xw config info
+
+Display all current server configuration settings.
+
+```bash
+xw config info
+```
+
+#### Example Output
+
+```
+Server Configuration:
+Name:           xw-server-prod
+Registry:       https://registry.example.com/packages.json
+Config Version: v0.0.2
+Host:           0.0.0.0
+Port:           8088
+Config Dir:     /home/user/.xw
+Data Dir:       /home/user/.xw/data
+```
+
+### xw config get
+
+Get the value of a specific configuration key.
+
+```bash
+xw config get <key>
+```
+
+#### Supported Keys
+
+<ParamField path="name" type="string">
+  Server instance identifier
+</ParamField>
+
+<ParamField path="registry" type="string">
+  Configuration package registry URL
+</ParamField>
+
+<ParamField path="host" type="string">
+  Server host address
+</ParamField>
+
+<ParamField path="port" type="integer">
+  Server port number
+</ParamField>
+
+<ParamField path="config_dir" type="string">
+  Configuration directory path
+</ParamField>
+
+<ParamField path="data_dir" type="string">
+  Data directory path
+</ParamField>
+
+### xw config set
+
+Set the value of a specific configuration key.
+
+```bash
+xw config set <key> <value>
+```
+
+#### Modifiable Keys
+
+<ParamField path="registry" type="string">
+  Configuration package registry URL (must be valid HTTP/HTTPS URL)
+</ParamField>
+
+<Note>
+  **Note:** Server name, host, and port cannot be modified via this command.
+  
+  - `name`: Tied to running container instances (modification would break instance management)
+  - `host`/`port`: Use command-line flags (`--host`, `--port`) or edit `server.conf` manually
+</Note>
+
+## Examples
+
+### View all configuration
+
+```bash
+xw config info
+```
+
+### Get server name
+
+```bash
+xw config get name
+```
+
+```
+xw-server-prod
+```
+
+### Get registry URL
+
+```bash
+xw config get registry
+```
+
+```
+https://registry.example.com/packages.json
+```
+
+### Get server port
+
+```bash
+xw config get port
+```
+
+```
+8088
+```
+
+### Set custom registry URL
+
+```bash
+xw config set registry https://custom.registry.com/packages.json
+```
+
+```
+✓ Configuration updated: registry = https://custom.registry.com/packages.json
+```
+
+### View configuration directory
+
+```bash
+xw config get config_dir
+```
+
+```
+/home/user/.xw
+```
+
+## Configuration Keys Reference
+
+### name
+
+Server instance identifier. This is used to distinguish between different xw server instances. Cannot be modified via `config set` as it's tied to running container instances.
+
+### registry
+
+URL to the configuration package registry (packages.json). This determines where configuration updates are downloaded from. Must be a valid HTTP/HTTPS URL.
+
+### host
+
+Server host address. Defaults to `0.0.0.0` (listen on all interfaces). Cannot be modified via `config set` - use command-line flags or edit `server.conf`.
+
+### port
+
+Server port number. Defaults to `8088`. Cannot be modified via `config set` - use command-line flags or edit `server.conf`.
+
+### config_dir
+
+Directory where configuration files are stored. Defaults to `~/.xw`. Read-only.
+
+### data_dir
+
+Directory where runtime data is stored. Defaults to `~/.xw/data`. Read-only.
+
+## See Also
+
+- [xw update](/cli/update) - Update configuration versions
+- [xw reload](/cli/reload) - Reload configuration files
+- [xw version](/cli/version) - Display version information

@@ -1,0 +1,112 @@
+---
+title: xw pull
+description: Download and install AI models from the registry
+---
+
+## Usage
+
+```bash
+xw pull MODEL
+```
+
+## Description
+
+Download and install an AI model from the registry. The model files are downloaded to the XW server and prepared for execution. This command must be run before a model can be used with `xw run`.
+
+The command checks model compatibility with your current AI accelerator and warns you if the model is not supported by your hardware.
+
+## Arguments
+
+<ParamField path="MODEL" type="string" required>
+  Name of the model to download (e.g., `qwen2-0.5b`, `qwen2-7b`)
+</ParamField>
+
+## Options
+
+<ParamField path="-v, --verbose" type="boolean" default="false">
+  Enable verbose logging
+</ParamField>
+
+## Examples
+
+### Pull a small model
+
+```bash
+xw pull qwen2-0.5b
+```
+
+Downloads the Qwen2 0.5B parameter model.
+
+### Pull a larger model
+
+```bash
+xw pull qwen2-7b
+```
+
+Downloads the Qwen2 7B parameter model.
+
+### Pull with verbose output
+
+```bash
+xw pull qwen2.5-7b-instruct -v
+```
+
+Shows detailed progress information during download.
+
+## Output
+
+### Successful download
+
+```
+Pulling qwen2-7b...
+[========================================] 100%
+✓ Model pulled successfully
+```
+
+### Unsupported model warning
+
+If the model is not supported by your hardware:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        ⚠️  WARNING                              │
+└─────────────────────────────────────────────────────────────────┘
+
+  Model 'qwen2-7b' is NOT supported by your current AI accelerator.
+
+  This model may:
+    • Fail to start or run
+    • Experience compatibility issues
+    • Require unsupported features or operations
+
+  It is recommended to use models compatible with your hardware.
+
+  Do you want to proceed anyway? (y/N):
+```
+
+You can type `y` to proceed with the download anyway, or `N` to cancel.
+
+## Error Handling
+
+If the model doesn't exist:
+
+```
+failed to pull model: model not found
+```
+
+If there's a network error:
+
+```
+failed to pull model: connection failed
+```
+
+## Related Commands
+
+- [`xw ls`](/cli/ls) - List available and downloaded models
+- [`xw run`](/cli/run) - Run a model after pulling
+- [`xw start`](/cli/start) - Start a model instance
+
+## See Also
+
+- [Supported Models](/guides/supported-models) - Browse available models
+- [Device Support](/concepts/device-support) - Check supported devices

@@ -1,0 +1,141 @@
+---
+title: xw ps
+description: List running model instances
+---
+
+## Usage
+
+```bash
+xw ps [flags]
+```
+
+## Description
+
+List all model instances with their status and configuration. Shows both running and stopped instances.
+
+This command is similar to `docker ps` and provides information about active model deployments, including their state, uptime, and resource allocation.
+
+## Aliases
+
+- `xw list` (when used in instance context)
+
+## Options
+
+<ParamField path="-a, --all" type="boolean" default="true">
+  Show all instances (default: true). This flag is included for consistency with Docker but is enabled by default.
+</ParamField>
+
+<ParamField path="-v, --verbose" type="boolean" default="false">
+  Enable verbose logging
+</ParamField>
+
+## Examples
+
+### List all instances
+
+```bash
+xw ps
+```
+
+Shows all running and stopped instances.
+
+### List with verbose output
+
+```bash
+xw ps -v
+```
+
+Provides additional debug information.
+
+## Output
+
+### Running instances
+
+```
+ALIAS              MODEL                   ENGINE          LOCAL PORT   CONTAINER ID   STATE    UPTIME
+my-chat            qwen2.5-7b-instruct    vllm:docker     8001         a1b2c3d4e5f6   ready    2h
+test-model         qwen2-0.5b             mindie:native   8002         -              ready    15m
+production         qwen2.5-14b            vllm:docker     8003         b2c3d4e5f6g7   ready    3d
+```
+
+### No instances found
+
+```
+No instances found
+
+Start a model with: xw start <model>
+```
+
+## Column Descriptions
+
+- **ALIAS**: Instance alias/name used to identify the instance
+- **MODEL**: Model ID being run
+- **ENGINE**: Inference engine in `backend:mode` format (e.g., `vllm:docker`, `mindie:native`)
+- **LOCAL PORT**: Port where the instance API is accessible
+- **CONTAINER ID**: Docker container ID (first 12 characters) or `-` for native deployments
+- **STATE**: Current state of the instance
+- **UPTIME**: Time since the instance was started
+
+## Instance States
+
+- **ready**: Instance is running and ready to accept requests
+- **starting**: Instance is starting up
+- **loading**: Instance is loading the model into memory
+- **error**: Instance encountered an error and failed to start
+- **stopping**: Instance is shutting down
+- **stopped**: Instance has been stopped
+
+## Uptime Format
+
+- `15s` - 15 seconds
+- `5m` - 5 minutes  
+- `2h` - 2 hours
+- `3d` - 3 days
+
+## Understanding the Output
+
+### Container ID
+
+- For Docker deployments: Shows the first 12 characters of the container ID (like Docker)
+- For native deployments: Shows `-` since there is no container
+
+### Port Numbers
+
+The local port is where you can access the instance's OpenAI-compatible API:
+
+```bash
+curl http://localhost:8001/v1/models
+```
+
+## Error States
+
+If an instance shows `error` state:
+
+```
+ALIAS         MODEL           ENGINE          LOCAL PORT   CONTAINER ID   STATE    UPTIME
+failed-test   qwen2-7b       vllm:docker     -            c3d4e5f6g7h8   error    -
+```
+
+Use [`xw logs`](/cli/logs) to view the error details:
+
+```bash
+xw logs failed-test
+```
+
+Then stop and remove the failed instance:
+
+```bash
+xw stop failed-test
+```
+
+## Related Commands
+
+- [`xw start`](/cli/start) - Start a new model instance
+- [`xw stop`](/cli/stop) - Stop and remove an instance
+- [`xw logs`](/cli/logs) - View instance logs
+- [`xw run`](/cli/run) - Run a model with interactive chat
+
+## See Also
+
+- [Runtime API](/api/endpoints/runtime) - Manage instances programmatically
+- [Troubleshooting](/guides/troubleshooting) - Common issues and solutions

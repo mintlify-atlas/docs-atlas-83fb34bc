@@ -1,0 +1,184 @@
+---
+title: xw update
+description: Update configuration to a new version
+---
+
+Update configuration to a new version. By default, updates to the latest version compatible with your xw binary.
+
+## Synopsis
+
+```bash
+xw update [flags]
+```
+
+## Description
+
+The `update` command manages configuration version updates. It communicates with the xw server to download and switch configuration versions.
+
+The configuration version determines which `devices.yaml`, `models.yaml`, and `runtime_params.yaml` files are used. Different versions may support different hardware accelerators or have different default settings.
+
+After updating, the configuration is automatically reloaded. If auto-reload fails, you must manually reload with `xw reload` or restart the server.
+
+## Options
+
+<ParamField path="--version" type="string">
+  Specific version to update to (e.g., `v0.0.2`)
+</ParamField>
+
+<ParamField path="--list" type="boolean" default="false">
+  List available versions from the registry
+</ParamField>
+
+<ParamField path="--show-current" type="boolean" default="false">
+  Show current configuration version
+</ParamField>
+
+## Examples
+
+### Update to latest compatible version
+
+```bash
+xw update
+```
+
+```
+Checking for updates...
+Previous version: v0.0.1
+New version:      v0.0.2
+
+✓ Downloaded: v0.0.2.tar.gz
+✓ SHA256 verified
+✓ Extracted to ~/.xw/v0.0.2/
+
+✓ Configuration updated to v0.0.2
+
+⟳ Reloading configuration...
+✓ Configuration reloaded successfully
+```
+
+### Update to specific version
+
+```bash
+xw update --version v0.0.3
+```
+
+```
+Updating to version v0.0.3...
+Previous version: v0.0.2
+New version:      v0.0.3
+
+✓ Downloaded: v0.0.3.tar.gz
+✓ SHA256 verified
+✓ Extracted to ~/.xw/v0.0.3/
+
+✓ Configuration updated to v0.0.3
+
+⟳ Reloading configuration...
+✓ Configuration reloaded successfully
+```
+
+### List available versions
+
+```bash
+xw update --list
+```
+
+```
+Available Configuration Versions:
+Current xw version: v0.2.0
+Current config: v0.0.2
+
+Compatible versions (can be used with current xw):
+  v0.0.3        (2024-01-15) - Add support for Ascend 910C (installed)
+  v0.0.2        (2024-01-10) - Update runtime parameters
+  v0.0.1        (2024-01-05) - Initial release (installed)
+
+Requires newer xw binary:
+  v0.1.0        (requires xw >= v0.3.0)
+```
+
+### Show current version
+
+```bash
+xw update --show-current
+```
+
+```
+Current configuration version: v0.0.2
+✓ Configuration files present
+```
+
+If configuration files are missing:
+
+```bash
+xw update --show-current
+```
+
+```
+Current configuration version: v0.0.2
+⚠ Configuration files not found (run 'xw update' to download)
+```
+
+## Understanding Version Compatibility
+
+Configuration packages have a `min_xw_version` field that specifies the minimum xw binary version required. The `xw update --list` command shows:
+
+- **Compatible versions**: Can be used with your current xw binary
+- **Incompatible versions**: Require a newer xw binary (shown with required version)
+
+### Example
+
+If you're running xw v0.2.0:
+- Config v0.0.3 (requires xw >= v0.2.0) ✓ Compatible
+- Config v0.1.0 (requires xw >= v0.3.0) ✗ Incompatible (need to upgrade xw first)
+
+## Registry Unavailability
+
+If the registry is unavailable, `xw update --list` will show only locally installed versions:
+
+```bash
+xw update --list
+```
+
+```
+Available Configuration Versions:
+Current xw version: v0.2.0
+Current config: v0.0.2
+
+⚠ Unable to access remote package registry
+  Showing locally installed versions only
+
+Installed versions:
+  v0.0.2
+  v0.0.1
+```
+
+## Update Process
+
+When you run `xw update`, the following steps occur:
+
+1. **Query registry** - Check available versions and compatibility
+2. **Download package** - Download `.tar.gz` file for selected version
+3. **Verify checksum** - Verify SHA256 checksum for integrity
+4. **Extract files** - Extract to `~/.xw/<version>/` directory
+5. **Update config** - Update server configuration to use new version
+6. **Auto-reload** - Automatically reload configuration (can be disabled)
+
+## Auto-Reload Behavior
+
+After a successful update, the configuration is automatically reloaded. If auto-reload fails, you'll see:
+
+```
+⚠ Auto-reload failed: connection refused
+
+Please reload manually:
+  xw reload
+  or restart the server:
+  sudo systemctl restart xw-server
+```
+
+## See Also
+
+- [xw reload](/cli/reload) - Reload configuration manually
+- [xw config](/cli/config) - View configuration settings
+- [xw version](/cli/version) - Display version information

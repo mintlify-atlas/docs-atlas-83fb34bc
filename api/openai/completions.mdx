@@ -1,0 +1,368 @@
+---
+title: 'Text Completions'
+description: 'POST /v1/completions - OpenAI-compatible text completion endpoint'
+---
+
+## POST /v1/completions
+
+Generate text completions using a running model instance. This endpoint is compatible with OpenAI's completions API.
+
+<Note>
+You must start a model instance first using `/api/runtime/start` before making completion requests.
+</Note>
+
+## Request
+
+### Headers
+
+```
+Content-Type: application/json
+```
+
+### Body Parameters
+
+<ParamField body="model" type="string" required>
+  Model identifier or instance alias (e.g., `"qwen2-0.5b"`, `"my-model-instance"`)
+</ParamField>
+
+<ParamField body="prompt" type="string | array" required>
+  Text prompt(s) to complete. Can be a single string or array of strings.
+</ParamField>
+
+<ParamField body="max_tokens" type="integer" optional>
+  Maximum number of tokens to generate. Default varies by model.
+</ParamField>
+
+<ParamField body="temperature" type="number" optional>
+  Sampling temperature (0.0 to 2.0). Higher values make output more random. Default: `0.7`
+</ParamField>
+
+<ParamField body="top_p" type="number" optional>
+  Nucleus sampling probability threshold (0.0 to 1.0). Default: `0.9`
+</ParamField>
+
+<ParamField body="top_k" type="integer" optional>
+  Top-K sampling parameter. Limits vocabulary to top K tokens.
+</ParamField>
+
+<ParamField body="stream" type="boolean" default="false">
+  Enable streaming responses via Server-Sent Events (SSE)
+</ParamField>
+
+<ParamField body="stop" type="string | array" optional>
+  Stop sequences. Generation stops when any of these sequences are encountered.
+</ParamField>
+
+<ParamField body="n" type="integer" default="1">
+  Number of completions to generate. Currently only `1` is supported.
+</ParamField>
+
+<ParamField body="presence_penalty" type="number" optional>
+  Presence penalty (-2.0 to 2.0). Penalizes tokens that have appeared.
+</ParamField>
+
+<ParamField body="frequency_penalty" type="number" optional>
+  Frequency penalty (-2.0 to 2.0). Penalizes tokens based on frequency.
+</ParamField>
+
+<ParamField body="logit_bias" type="object" optional>
+  Token-specific bias adjustments (not supported by all backends)
+</ParamField>
+
+## Response (Non-Streaming)
+
+### Response Fields
+
+<ResponseField name="id" type="string" required>
+  Unique completion identifier
+</ResponseField>
+
+<ResponseField name="object" type="string" required>
+  Object type, always `"text_completion"`
+</ResponseField>
+
+<ResponseField name="created" type="integer" required>
+  Unix timestamp of completion creation
+</ResponseField>
+
+<ResponseField name="model" type="string" required>
+  Model identifier used for generation
+</ResponseField>
+
+<ResponseField name="choices" type="array" required>
+  Array of completion choices
+</ResponseField>
+
+<ResponseField name="usage" type="object" required>
+  Token usage statistics
+</ResponseField>
+
+### Choice Object
+
+<ResponseField name="text" type="string" required>
+  Generated completion text
+</ResponseField>
+
+<ResponseField name="index" type="integer" required>
+  Choice index (always `0` for single completions)
+</ResponseField>
+
+<ResponseField name="finish_reason" type="string" required>
+  Reason generation stopped: `"stop"`, `"length"`, or `"content_filter"`
+</ResponseField>
+
+<ResponseField name="logprobs" type="object | null">
+  Log probabilities (if requested)
+</ResponseField>
+
+### Usage Object
+
+<ResponseField name="prompt_tokens" type="integer" required>
+  Number of tokens in the prompt
+</ResponseField>
+
+<ResponseField name="completion_tokens" type="integer" required>
+  Number of tokens in the completion
+</ResponseField>
+
+<ResponseField name="total_tokens" type="integer" required>
+  Total tokens used (prompt + completion)
+</ResponseField>
+
+## Examples
+
+### Basic Completion
+
+```bash
+curl -X POST http://localhost:11581/v1/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "qwen2-0.5b",
+    "prompt": "Once upon a time",
+    "max_tokens": 100,
+    "temperature": 0.7
+  }'
+```
+
+### Response
+
+```json
+{
+  "id": "cmpl-abc123",
+  "object": "text_completion",
+  "created": 1709640000,
+  "model": "qwen2-0.5b",
+  "choices": [
+    {
+      "text": " in a land far away, there lived a wise old wizard who...",
+      "index": 0,
+      "finish_reason": "stop",
+      "logprobs": null
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 4,
+    "completion_tokens": 50,
+    "total_tokens": 54
+  }
+}
+```
+
+### With Stop Sequences
+
+```bash
+curl -X POST http://localhost:11581/v1/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "qwen2-0.5b",
+    "prompt": "List three colors:\n1.",
+    "max_tokens": 50,
+    "temperature": 0.5,
+    "stop": ["\n\n", "4."]
+  }'
+```
+
+### Multiple Prompts
+
+```bash
+curl -X POST http://localhost:11581/v1/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "qwen2-0.5b",
+    "prompt": [
+      "The capital of France is",
+      "The capital of Germany is"
+    ],
+    "max_tokens": 10
+  }'
+```
+
+## Streaming Response
+
+When `"stream": true` is set, the response is streamed as Server-Sent Events:
+
+```bash
+curl -X POST http://localhost:11581/v1/completions \
+  -H "Content-Type: application/json" \
+  -H "Accept: text/event-stream" \
+  -d '{
+    "model": "qwen2-0.5b",
+    "prompt": "Once upon a time",
+    "max_tokens": 100,
+    "stream": true
+  }'
+```
+
+### Streaming Event Format
+
+Each event contains a JSON chunk:
+
+```
+data: {"id":"cmpl-abc123","object":"text_completion","created":1709640000,"choices":[{"text":" in","index":0,"finish_reason":null}],"model":"qwen2-0.5b"}
+
+data: {"id":"cmpl-abc123","object":"text_completion","created":1709640000,"choices":[{"text":" a","index":0,"finish_reason":null}],"model":"qwen2-0.5b"}
+
+data: {"id":"cmpl-abc123","object":"text_completion","created":1709640000,"choices":[{"text":" land","index":0,"finish_reason":null}],"model":"qwen2-0.5b"}
+
+data: [DONE]
+```
+
+### Python Streaming Example
+
+```python
+import requests
+import json
+
+url = "http://localhost:11581/v1/completions"
+payload = {
+    "model": "qwen2-0.5b",
+    "prompt": "Once upon a time",
+    "max_tokens": 100,
+    "stream": True
+}
+
+response = requests.post(url, json=payload, stream=True)
+
+for line in response.iter_lines():
+    if line:
+        line = line.decode('utf-8')
+        if line.startswith('data: '):
+            data = line[6:]  # Remove 'data: ' prefix
+            if data == '[DONE]':
+                break
+            chunk = json.loads(data)
+            text = chunk['choices'][0]['text']
+            print(text, end='', flush=True)
+```
+
+### JavaScript Streaming Example
+
+```javascript
+const fetchEventSource = require('@microsoft/fetch-event-source');
+
+const url = 'http://localhost:11581/v1/completions';
+const payload = {
+  model: 'qwen2-0.5b',
+  prompt: 'Once upon a time',
+  max_tokens: 100,
+  stream: true
+};
+
+await fetchEventSource(url, {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify(payload),
+  onmessage(event) {
+    if (event.data === '[DONE]') {
+      return;
+    }
+    const chunk = JSON.parse(event.data);
+    const text = chunk.choices[0].text;
+    process.stdout.write(text);
+  },
+  onerror(err) {
+    console.error('Stream error:', err);
+    throw err;
+  }
+});
+```
+
+## Error Responses
+
+### Model Not Found
+
+```json
+{
+  "error": "No running instance found for model: invalid-model",
+  "code": "404"
+}
+```
+
+### Model Not Running
+
+```json
+{
+  "error": "Model instance is not running (state: stopped)",
+  "code": "503"
+}
+```
+
+### Invalid Request
+
+```json
+{
+  "error": "Missing required field: model",
+  "code": "400"
+}
+```
+
+### Concurrency Limit
+
+```json
+{
+  "error": "Service temporarily unavailable (concurrency limit reached)",
+  "code": "503"
+}
+```
+
+## Notes
+
+### Model Instance Routing
+
+The proxy routes requests based on the `model` field:
+1. Searches for running instances by model ID
+2. Falls back to searching by instance alias
+3. Returns 404 if no matching instance is found
+
+### Backend Compatibility
+
+Not all parameters are supported by all backends:
+- **vLLM**: Supports most OpenAI parameters
+- **MindIE**: Limited parameter support
+- **Other backends**: Check backend-specific documentation
+
+### Concurrency Control
+
+The proxy manages concurrency per instance:
+- Each instance has a maximum concurrent request limit
+- Requests are queued when limit is reached
+- Returns 503 if queue is full
+
+### Timeout Behavior
+
+- Default timeout: 5 minutes
+- Streaming requests: No timeout (client connection timeout applies)
+- Failed requests are automatically retried once
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card title="Chat Completions" icon="comments" href="/api/openai/chat">
+    Multi-turn conversations with chat models
+  </Card>
+  <Card title="Runtime API" icon="play" href="/api/endpoints/runtime">
+    Start and manage model instances
+  </Card>
+</CardGroup>

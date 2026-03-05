@@ -1,0 +1,426 @@
+---
+title: Multi-Device Tensor Parallelism
+description: Deploy large models across multiple AI accelerators with tensor parallel inference
+---
+
+Tensor parallelism allows you to split large models across multiple devices, enabling inference of models that exceed single-device memory capacity or improving throughput for production workloads.
+
+## Overview
+
+XW CLI supports tensor parallelism for distributed model inference across multiple NPUs/GPUs. The runtime automatically:
+
+- Allocates devices based on topology (same interconnect box preferred)
+- Configures inter-device communication (HCCS, InfiniBand)
+- Splits model weights across devices
+- Coordinates inference execution
+
+<Info>
+  Tensor parallelism is most effective for large models (30B+ parameters) where single-device memory is insufficient or when maximizing throughput.
+</Info>
+
+## Quick Start
+
+### Basic Multi-Device Deployment
+
+Use the `--tp` flag to specify tensor parallel size:
+
+```bash
+# Deploy across 4 devices
+xw run qwen2.5-72b-instruct --tp 4
+
+# Deploy across 8 devices
+xw run qwen3-235b-a22b-w8a8 --tp 8
+```
+
+### Explicit Device Selection
+
+Manually specify devices:
+
+```bash
+# Use devices 0, 1, 2, 3
+xw run qwen2.5-72b-instruct --device 0,1,2,3
+
+# Use devices in second interconnect box
+xw run qwen2.5-72b-instruct --device 4,5,6,7
+```
+
+## Device Topology
+
+### Understanding Topology Configuration
+
+Device topology defines high-speed interconnect groupings ("boxes") for optimal data transfer. Devices within the same box communicate faster than across boxes.
+
+**Example topology from `devices.yaml`**:
+
+```yaml
+topology:
+  boxes:
+    - devices: [0, 1, 2, 3]  # Box 0: High-speed interconnect
+    - devices: [4, 5, 6, 7]  # Box 1: High-speed interconnect
+```
+
+<Note>
+  The allocator prioritizes devices within the same box to minimize inter-device latency.
+</Note>
+
+### Ascend 910B Topology
+
+Typical 8-card configuration:
+
+- **Box 0** (devices 0-3): Connected via HCCS (100GB/s)
+- **Box 1** (devices 4-7): Connected via HCCS (100GB/s)
+- **Cross-box**: Connected via host PCIe (slower)
+
+### Ascend 310P Topology
+
+Dual-chip cards configuration:
+
+- **Each physical card** = 2 logical chips
+- **Box per card**: Chips on same card are high-speed connected
+
+```yaml
+topology:
+  boxes:
+    - devices: [0, 1]  # Physical card 0
+    - devices: [2, 3]  # Physical card 1
+    - devices: [4, 5]  # Physical card 2
+    - devices: [6, 7]  # Physical card 3
+```
+
+### MetaX C550 Topology
+
+Connected via InfiniBand for multi-device communication.
+
+## Allocation Strategy
+
+### Automatic Device Allocation
+
+When using `--tp`, the runtime follows this logic:
+
+```go
+// From internal/runtime/manager.go:224
+if needDeviceAllocation && worldSize > 0 {
+    allocator.Allocate(instanceID, worldSize)
+    // Allocates 'worldSize' devices with topology-awareness
+}
+```
+
+**Allocation rules** (`internal/device/allocator.go:224`):
+
+1. **Group by model**: Prefer same device model (e.g., all Ascend 910B1)
+2. **Topology-aware**: Minimize distance between devices
+3. **Availability check**: Skip allocated devices (detected via Docker labels)
+4. **Fallback**: If insufficient devices in one box, span multiple boxes
+
+### Valid Tensor Parallel Sizes
+
+<Warning>
+  Tensor parallel size must be: **0, 1, 2, 4, or 8**
+</Warning>
+
+Validation from `internal/runtime/manager.go:161`:
+
+```go
+if value != 0 && value != 1 && value != 2 && value != 4 && value != 8 {
+    return fmt.Errorf("tensor_parallel must be 0, 1, 2, 4, or 8 (got %d)", value)
+}
+```
+
+## Configuration Methods
+
+### Method 1: Using --tp Flag
+
+Let XW automatically allocate devices:
+
+```bash
+# Runtime allocates 4 best-fit devices
+xw run qwen2.5-72b-instruct --tp 4
+```
+
+**Behavior**:
+- `WORLD_SIZE=4`
+- `TENSOR_PARALLEL=4`
+- Devices allocated from same topology box if possible
+
+### Method 2: Using --device Flag
+
+Manually control device selection:
+
+```bash
+# Explicitly use devices 0,1,2,3
+xw run qwen2.5-72b-instruct --device 0,1,2,3
+```
+
+**Behavior**:
+- `WORLD_SIZE=4`
+- `TENSOR_PARALLEL=4`
+- Uses exactly specified devices
+
+### Method 3: Template world_size
+
+Pre-configure in runtime parameters (`runtime_params.yaml`):
+
+```yaml
+templates:
+  ascend-910b_qwen2.5-72b-instruct_vllm:
+    - world_size=4
+    - max_model_len=32768
+```
+
+**Behavior**:
+- `WORLD_SIZE=4`
+- Devices auto-allocated if not specified
+- Template applied automatically for model+device combination
+
+<Accordion title="Combining --tp and --device">
+  If both flags are provided, they **must match**:
+  
+  ```bash
+  # Valid: TP matches device count
+  xw run model --tp 4 --device 0,1,2,3
+  
+  # Invalid: TP != device count
+  xw run model --tp 4 --device 0,1  # Error!
+  ```
+  
+  From `internal/runtime/manager.go:179`:
+  
+  ```go
+  if configTP != deviceCount {
+      return fmt.Errorf("tensor_parallel (%d) must equal device count (%d)", 
+          configTP, deviceCount)
+  }
+  ```
+</Accordion>
+
+## Runtime Environment Variables
+
+The runtime sets these environment variables based on TP configuration:
+
+### Common Variables
+
+```bash
+WORLD_SIZE=4           # Total number of processes
+TENSOR_PARALLEL=4      # Tensor parallel size
+PIPELINE_PARALLEL=1    # Pipeline parallel size (always 1)
+```
+
+### Device-Specific Variables
+
+**Ascend (vLLM)**:
+```bash
+ASCEND_RT_VISIBLE_DEVICES="0,1,2,3"
+ASCEND_VISIBLE_DEVICES="0,1,2,3,4,5,6,7"
+```
+
+**Ascend (MindIE)**:
+```bash
+MINDIE_NPU_DEVICE_IDS="0,1,2,3"
+```
+
+**MetaX (vLLM)**:
+```bash
+CUDA_VISIBLE_DEVICES="0,1,2,3"
+```
+
+## Performance Considerations
+
+### When to Use Tensor Parallelism
+
+<CardGroup cols={2}>
+  <Card title="Use TP When" icon="check">
+    - Model doesn't fit in single device memory
+    - Need higher throughput (scale out)
+    - Have high-speed interconnect (HCCS/InfiniBand)
+    - Batch size is large enough
+  </Card>
+  <Card title="Avoid TP When" icon="xmark">
+    - Model fits on single device
+    - Low latency is critical
+    - Small batch sizes
+    - Limited interconnect bandwidth
+  </Card>
+</CardGroup>
+
+### Latency Impact
+
+Tensor parallelism introduces communication overhead:
+
+- **Same box (HCCS)**: ~5-10% latency increase
+- **Cross-box (PCIe)**: ~15-25% latency increase
+- **InfiniBand**: ~10-15% latency increase
+
+<Info>
+  For latency-sensitive applications, prefer single-device deployment when possible.
+</Info>
+
+### Throughput Scaling
+
+Expected throughput scaling:
+
+- **2 devices**: 1.7-1.9x
+- **4 devices**: 3.2-3.6x
+- **8 devices**: 6.0-7.0x
+
+Actual scaling depends on:
+- Model architecture (attention layers benefit most)
+- Batch size (larger = better)
+- Interconnect topology
+- Input/output token ratio
+
+## Troubleshooting
+
+### Insufficient Devices
+
+**Error**:
+```
+failed to allocate 4 device(s): insufficient devices available
+```
+
+**Solutions**:
+1. Check available devices:
+   ```bash
+   xw device list
+   ```
+
+2. Stop unused instances:
+   ```bash
+   xw ps
+   xw stop <instance-id>
+   ```
+
+3. Reduce TP size:
+   ```bash
+   xw run model --tp 2  # Instead of --tp 4
+   ```
+
+### Device Allocation Conflicts
+
+**Error**:
+```
+device index 0 out of range (available: 4 devices)
+```
+
+**Solution**: Check actual device count:
+```bash
+xw device list  # Shows available device indices
+```
+
+### Cross-Box Performance Issues
+
+If allocated devices span multiple boxes, performance may degrade.
+
+**Check allocation**:
+```bash
+xw ps  # Shows which devices are used
+```
+
+**Force same-box allocation**:
+```bash
+# Explicitly specify devices in same box
+xw run model --device 0,1,2,3  # Box 0
+```
+
+### HCCS Link Errors
+
+**Error** (in logs):
+```
+HCCS link error on device 2
+```
+
+**Diagnosis**:
+```bash
+# Check NPU status
+npu-smi info
+
+# Check NPU health
+npu-smi info -t health
+```
+
+**Solution**: May indicate hardware issue, contact system administrator.
+
+## Advanced Configuration
+
+### Custom Topology
+
+Modify `devices.yaml` to match your hardware:
+
+```yaml
+chip_models:
+  - config_key: ascend-910b
+    topology:
+      boxes:
+        - devices: [0, 1, 2, 3]
+        - devices: [4, 5, 6, 7]
+```
+
+Reload configuration:
+```bash
+xw reload
+```
+
+### Hybrid Parallelism
+
+<Warning>
+  Pipeline parallelism (`--pp`) is not yet supported. Only tensor parallelism is available.
+</Warning>
+
+Future support planned for:
+- Pipeline parallelism (PP)
+- Hybrid TP+PP strategies
+
+## Examples
+
+### Example 1: 72B Model on 4 Devices
+
+```bash
+# Automatic allocation
+xw run qwen2.5-72b-instruct --tp 4
+
+# Check status
+xw ps
+
+# View logs
+xw logs qwen2.5-72b-instruct
+```
+
+### Example 2: 235B Model on 8 Devices
+
+```bash
+# Requires 8-device system
+xw run qwen3-235b-a22b-w8a8 --tp 8
+
+# Verify device usage
+xw device list
+```
+
+### Example 3: Manual Device Selection
+
+```bash
+# Use second interconnect box (devices 4-7)
+xw run qwen2.5-72b-instruct --device 4,5,6,7
+```
+
+## Best Practices
+
+<Steps>
+  <Step title="Profile first">
+    Test model on single device before using TP to establish baseline performance.
+  </Step>
+  <Step title="Match topology">
+    Ensure TP size matches your topology boxes (2, 4, or 8 for most systems).
+  </Step>
+  <Step title="Monitor resources">
+    Use `xw device list` and `xw ps` to track device utilization.
+  </Step>
+  <Step title="Optimize batch size">
+    Larger batch sizes improve TP efficiency. Start with batch size ≥ TP size.
+  </Step>
+  <Step title="Use quantization">
+    W8A8 or W4A8 quantization reduces memory and can avoid TP in some cases.
+  </Step>
+</Steps>
+
+<Note>
+  For detailed implementation, see `internal/runtime/manager.go:121-279` and `internal/device/allocator.go:224`.
+</Note>

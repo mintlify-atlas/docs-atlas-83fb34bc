@@ -1,0 +1,138 @@
+---
+title: 'API Overview'
+description: 'XW CLI HTTP API overview and general concepts'
+---
+
+## Introduction
+
+The XW CLI exposes a local HTTP API server for managing AI models, runtime instances, and hardware devices. The API follows RESTful principles and uses JSON for request/response payloads.
+
+## Base URL
+
+The API server runs locally on your machine:
+
+```
+http://localhost:11581
+```
+
+The default port is `11581`, but can be configured via the `--port` flag when starting the server.
+
+## API Categories
+
+The XW API is organized into the following categories:
+
+### Core API Endpoints
+
+- **Health & Status**: `/api/health`, `/api/version`
+- **Models**: `/api/models/*` - List, download, and manage AI models
+- **Runtime**: `/api/runtime/*` - Start, stop, and monitor model instances
+- **Devices**: `/api/devices/*` - Query available AI accelerators
+- **Configuration**: `/api/config/*` - Manage server configuration
+
+### OpenAI-Compatible Endpoints
+
+XW provides OpenAI-compatible endpoints for inference:
+
+- **Chat Completions**: `/v1/chat/completions`
+- **Text Completions**: `/v1/completions`
+
+These endpoints proxy requests to running model instances and support both streaming and non-streaming modes.
+
+## Authentication
+
+**The XW API is local-only and does not require authentication.** 
+
+The server binds to `localhost` by default and is designed to be accessed only from the local machine. Do not expose the API server to untrusted networks.
+
+<Warning>
+The API server has no authentication mechanism. Only run it on trusted local networks or use proper network isolation.
+</Warning>
+
+## Request Format
+
+All API requests must:
+
+- Use `Content-Type: application/json` for POST requests with a body
+- Include a valid JSON payload when required
+- Use appropriate HTTP methods (GET, POST)
+
+## Response Format
+
+All API responses return JSON with appropriate HTTP status codes:
+
+### Success Response
+
+```json
+{
+  "field1": "value1",
+  "field2": "value2"
+}
+```
+
+### Error Response
+
+Standardized error format:
+
+```json
+{
+  "error": "Human-readable error message",
+  "code": "500"
+}
+```
+
+## HTTP Status Codes
+
+- `200 OK` - Request successful
+- `400 Bad Request` - Invalid request body or parameters
+- `404 Not Found` - Resource not found
+- `405 Method Not Allowed` - Invalid HTTP method
+- `500 Internal Server Error` - Server-side error
+- `503 Service Unavailable` - Service temporarily unavailable
+
+## Streaming Responses
+
+Some endpoints support Server-Sent Events (SSE) for streaming:
+
+- Model startup progress: `/api/runtime/start` with `Accept: text/event-stream`
+- Instance logs: `/api/runtime/logs`
+- OpenAI streaming: `/v1/chat/completions` and `/v1/completions` with `"stream": true`
+
+SSE responses use `Content-Type: text/event-stream` and send incremental updates.
+
+## Common Patterns
+
+### Polling for Readiness
+
+After starting a model instance, poll the readiness endpoint:
+
+```bash
+curl http://localhost:11581/api/runtime/check-ready?alias=my-model
+```
+
+### Error Handling
+
+All endpoints return errors in a consistent format. Check the `error` field and HTTP status code.
+
+### Model Identification
+
+Models are identified by:
+- **Model ID**: Internal identifier (e.g., `qwen2-0.5b`)
+- **Source ID**: Download source (e.g., `Qwen/Qwen2-0.5B`)
+- **Alias**: User-assigned instance name
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Health Endpoint" icon="heart-pulse" href="/api/endpoints/health">
+    Check server health and availability
+  </Card>
+  <Card title="Models API" icon="cube" href="/api/endpoints/models">
+    Manage AI models and downloads
+  </Card>
+  <Card title="Runtime API" icon="play" href="/api/endpoints/runtime">
+    Start and manage model instances
+  </Card>
+  <Card title="OpenAI Chat" icon="comments" href="/api/openai/chat">
+    OpenAI-compatible chat completions
+  </Card>
+</CardGroup>

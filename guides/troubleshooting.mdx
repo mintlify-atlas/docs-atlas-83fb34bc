@@ -1,0 +1,763 @@
+---
+title: Troubleshooting
+description: Common issues, error messages, and solutions for XW CLI
+---
+
+This guide covers common issues you may encounter when using XW CLI, along with diagnostic steps and solutions.
+
+## Hardware & Driver Issues
+
+### No Devices Detected
+
+<AccordionGroup>
+  <Accordion title="Symptom: 'No AI devices detected' error" icon="triangle-exclamation">
+    **Error message**:
+    ```
+    No AI devices detected. Please install device drivers.
+    ```
+    
+    **Diagnosis**:
+    ```bash
+    # Check PCI devices
+    lspci | grep -i "Processing\|3D\|VGA"
+    
+    # Check for Ascend devices
+    ls -l /dev/davinci*
+    
+    # Check for MetaX devices
+    ls -l /dev/dri/
+    ```
+    
+    **Solutions**:
+    
+    <Steps>
+      <Step title="Verify hardware is installed">
+        ```bash
+        # Should show vendor:device IDs
+        lspci -nn | grep "19e5\|9999"
+        ```
+      </Step>
+      
+      <Step title="Install device drivers">
+        **Ascend NPU**:
+        ```bash
+        # Check driver installation
+        cat /usr/local/Ascend/driver/version.info
+        
+        # Verify npu-smi works
+        npu-smi info
+        ```
+        
+        **MetaX GPU**:
+        ```bash
+        # Check MetaX driver
+        ls -l /dev/mxcd
+        ```
+      </Step>
+      
+      <Step title="Reload XW configuration">
+        ```bash
+        xw reload
+        xw device list
+        ```
+      </Step>
+    </Steps>
+  </Accordion>
+  
+  <Accordion title="Device shows as 'Unavailable'" icon="circle-xmark">
+    **Symptom**: Device detected but marked unavailable in `xw device list`
+    
+    **Common causes**:
+    1. Device already allocated to another instance
+    2. Device has a hardware error
+    3. Driver not fully initialized
+    
+    **Diagnosis**:
+    ```bash
+    # Check running instances
+    xw ps
+    
+    # Check device health (Ascend)
+    npu-smi info -t health
+    
+    # Check Docker container allocations
+    docker ps --format '{{.Names}}\t{{.Labels}}' | grep xw
+    ```
+    
+    **Solutions**:
+    
+    <Tabs>
+      <Tab title="Device In Use">
+        Stop the instance using the device:
+        ```bash
+        xw stop <instance-id>
+        ```
+      </Tab>
+      
+      <Tab title="Hardware Error">
+        Reset the device:
+        ```bash
+        # Ascend NPU reset
+        npu-smi set -i 0 -t reset
+        ```
+        
+        If reset fails, reboot the system.
+      </Tab>
+      
+      <Tab title="Driver Issue">
+        Restart the device driver service:
+        ```bash
+        # Ascend
+        sudo systemctl restart ascend-driver
+        
+        # Then reload XW
+        xw reload
+        ```
+      </Tab>
+    </Tabs>
+  </Accordion>
+  
+  <Accordion title="npu-smi command not found" icon="terminal">
+    **Error**: `bash: npu-smi: command not found`
+    
+    **Cause**: Ascend CANN toolkit not installed or not in PATH
+    
+    **Solution**:
+    ```bash
+    # Add to ~/.bashrc or ~/.zshrc
+    export PATH=/usr/local/Ascend/driver/tools:$PATH
+    
+    # Reload shell
+    source ~/.bashrc
+    
+    # Verify
+    npu-smi info
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Docker Issues
+
+<AccordionGroup>
+  <Accordion title="Docker daemon not running" icon="docker">
+    **Error**: `Cannot connect to the Docker daemon`
+    
+    **Diagnosis**:
+    ```bash
+    # Check Docker status
+    systemctl status docker
+    
+    # Test Docker connectivity
+    docker ps
+    ```
+    
+    **Solutions**:
+    
+    <Steps>
+      <Step title="Start Docker service">
+        ```bash
+        sudo systemctl start docker
+        sudo systemctl enable docker
+        ```
+      </Step>
+      
+      <Step title="Add user to docker group">
+        ```bash
+        sudo usermod -aG docker $USER
+        
+        # Log out and back in, or:
+        newgrp docker
+        ```
+      </Step>
+      
+      <Step title="Verify Docker works">
+        ```bash
+        docker run hello-world
+        ```
+      </Step>
+    </Steps>
+  </Accordion>
+  
+  <Accordion title="Image pull fails" icon="download">
+    **Error**: `failed to pull image: context deadline exceeded`
+    
+    **Causes**:
+    1. Network connectivity issues
+    2. Registry authentication required
+    3. Image doesn't exist
+    
+    **Solutions**:
+    
+    <Tabs>
+      <Tab title="Network">
+        Test connectivity:
+        ```bash
+        # Test registry access
+        curl https://harbor.tsingmao.com/v2/
+        
+        # Configure HTTP proxy if needed
+        sudo mkdir -p /etc/systemd/system/docker.service.d
+        sudo tee /etc/systemd/system/docker.service.d/http-proxy.conf << EOF
+        [Service]
+        Environment="HTTP_PROXY=http://proxy.example.com:8080"
+        Environment="HTTPS_PROXY=http://proxy.example.com:8080"
+        EOF
+        
+        sudo systemctl daemon-reload
+        sudo systemctl restart docker
+        ```
+      </Tab>
+      
+      <Tab title="Authentication">
+        Login to registry:
+        ```bash
+        docker login harbor.tsingmao.com
+        # Enter username and password
+        ```
+      </Tab>
+      
+      <Tab title="Manual Pull">
+        Pull image manually:
+        ```bash
+        # Get image name from error message
+        docker pull harbor.tsingmao.com/xw-cli/vllm-ascend:v0.14.0rc1-arm64
+        ```
+      </Tab>
+    </Tabs>
+  </Accordion>
+  
+  <Accordion title="Container fails to start" icon="box">
+    **Error**: `failed to start instance: container exited immediately`
+    
+    **Diagnosis**:
+    ```bash
+    # Get container ID from xw ps
+    xw ps
+    
+    # Check Docker logs
+    docker logs <container-id>
+    
+    # Inspect container
+    docker inspect <container-id>
+    ```
+    
+    **Common causes and solutions**:
+    
+    <Card title="Device mount failures">
+      **Error in logs**: `Error response from daemon: error gathering device information`
+      
+      **Solution**: Check device nodes exist:
+      ```bash
+      ls -l /dev/davinci*  # Ascend
+      ls -l /dev/dri/      # MetaX
+      ```
+    </Card>
+    
+    <Card title="Missing volumes">
+      **Error in logs**: `no such file or directory: '/usr/local/Ascend/driver'`
+      
+      **Solution**: Verify driver installation:
+      ```bash
+      ls -l /usr/local/Ascend/driver/
+      ```
+    </Card>
+    
+    <Card title="Insufficient shared memory">
+      **Error in logs**: `Failed to allocate shared memory`
+      
+      **Solution**: Increase Docker shm size in `runtime_params.yaml`:
+      ```yaml
+      templates:
+        ascend-910b_model_vllm:
+          - shm_size_gb=200  # Increase from default 100
+      ```
+    </Card>
+  </Accordion>
+</AccordionGroup>
+
+## Runtime Errors
+
+<AccordionGroup>
+  <Accordion title="Model not found" icon="file-slash">
+    **Error**: `model not found: my-model`
+    
+    **Cause**: Model not in `models.yaml` or not compatible with your hardware
+    
+    **Solutions**:
+    
+    <Steps>
+      <Step title="Check model list">
+        ```bash
+        xw ls  # Shows only compatible models
+        ```
+      </Step>
+      
+      <Step title="Check hardware compatibility">
+        ```bash
+        xw device list
+        # Note your device type (e.g., ascend-910b)
+        ```
+        
+        Verify model supports your device in `configs/0.0.1/models.yaml`:
+        ```yaml
+        supported_devices:
+          ascend-910b:  # Your device type
+            - vllm:docker
+        ```
+      </Step>
+      
+      <Step title="Add custom model">
+        See [Custom Models guide](/guides/custom-models) if model is missing.
+      </Step>
+    </Steps>
+  </Accordion>
+  
+  <Accordion title="Insufficient devices" icon="microchip">
+    **Error**: `failed to allocate 4 device(s): insufficient devices available`
+    
+    **Cause**: Not enough free devices for tensor parallelism
+    
+    **Solutions**:
+    
+    <Tabs>
+      <Tab title="Check Usage">
+        ```bash
+        # See what's using devices
+        xw ps
+        
+        # See device status
+        xw device list
+        ```
+      </Tab>
+      
+      <Tab title="Stop Instances">
+        ```bash
+        # Stop unused instances
+        xw stop <instance-id>
+        
+        # Or stop all
+        xw ps --quiet | xargs -I {} xw stop {}
+        ```
+      </Tab>
+      
+      <Tab title="Reduce TP Size">
+        ```bash
+        # Use fewer devices
+        xw run model --tp 2  # Instead of --tp 4
+        
+        # Or use single device
+        xw run model  # No TP
+        ```
+      </Tab>
+    </Tabs>
+  </Accordion>
+  
+  <Accordion title="Port already in use" icon="plug">
+    **Error**: `failed to allocate port: address already in use`
+    
+    **Cause**: Default port 8000 is occupied
+    
+    **Solutions**:
+    
+    <Tabs>
+      <Tab title="Check Port Usage">
+        ```bash
+        # See what's using port 8000
+        sudo lsof -i :8000
+        
+        # Or with netstat
+        sudo netstat -tlnp | grep 8000
+        ```
+      </Tab>
+      
+      <Tab title="Use Different Port">
+        ```bash
+        xw run model --port 8001
+        ```
+      </Tab>
+      
+      <Tab title="Stop Conflicting Service">
+        ```bash
+        # If it's another XW instance
+        xw ps
+        xw stop <instance-id>
+        
+        # If it's another service
+        sudo systemctl stop <service-name>
+        ```
+      </Tab>
+    </Tabs>
+  </Accordion>
+  
+  <Accordion title="Model loading fails" icon="hourglass">
+    **Error** (in logs): `Failed to load model: out of memory`
+    
+    **Causes**:
+    1. Model too large for device memory
+    2. Incorrect quantization format
+    3. Memory fragmentation
+    
+    **Solutions**:
+    
+    <Steps>
+      <Step title="Check device memory">
+        ```bash
+        # Ascend NPU
+        npu-smi info
+        # Look at "Memory-Usage" column
+        ```
+      </Step>
+      
+      <Step title="Use tensor parallelism">
+        ```bash
+        # Split across multiple devices
+        xw run qwen2.5-72b-instruct --tp 4
+        ```
+      </Step>
+      
+      <Step title="Use quantized model">
+        ```bash
+        # Use W8A8 or W4A8 variant
+        xw run qwen3-32b-w8a8  # Instead of qwen3-32b
+        ```
+      </Step>
+      
+      <Step title="Adjust memory settings">
+        Edit `runtime_params.yaml`:
+        ```yaml
+        templates:
+          ascend-910b_model_vllm:
+            - gpu_memory_utilization=0.85  # Reduce from 0.9
+            - max_model_len=8192           # Reduce context length
+        ```
+      </Step>
+    </Steps>
+  </Accordion>
+</AccordionGroup>
+
+## Inference Issues
+
+<AccordionGroup>
+  <Accordion title="Slow inference" icon="snail">
+    **Symptom**: Inference takes much longer than expected
+    
+    **Diagnosis**:
+    ```bash
+    # Check device utilization
+    npu-smi info  # Should show high utilization during inference
+    
+    # Check instance logs
+    xw logs <instance-id>
+    ```
+    
+    **Common causes**:
+    
+    <Tabs>
+      <Tab title="Cross-box TP">
+        **Issue**: Tensor parallel devices span multiple topology boxes
+        
+        **Check**:
+        ```bash
+        xw ps  # Note which devices are used
+        ```
+        
+        **Solution**: Specify devices in same box:
+        ```bash
+        xw stop <instance-id>
+        xw run model --device 0,1,2,3  # All in box 0
+        ```
+      </Tab>
+      
+      <Tab title="Small Batch Size">
+        **Issue**: Not enough concurrent requests to saturate device
+        
+        **Solution**: Increase batch size in requests or enable continuous batching:
+        ```yaml
+        templates:
+          device_model_vllm:
+            - max_num_seqs=128  # Increase from default
+        ```
+      </Tab>
+      
+      <Tab title="Context Length">
+        **Issue**: Very long context windows slow down attention
+        
+        **Check logs**: Look for "context_length" in startup
+        
+        **Solution**: Reduce if not needed:
+        ```yaml
+        templates:
+          device_model_vllm:
+            - max_model_len=8192  # Instead of 32768
+        ```
+      </Tab>
+    </Tabs>
+  </Accordion>
+  
+  <Accordion title="Connection refused" icon="link-slash">
+    **Error**: `curl: (7) Failed to connect to localhost port 8000: Connection refused`
+    
+    **Causes**:
+    1. Instance not fully started
+    2. Instance crashed
+    3. Wrong port
+    
+    **Diagnosis**:
+    ```bash
+    # Check instance status
+    xw ps
+    
+    # Check logs for errors
+    xw logs <instance-id>
+    
+    # Verify port
+    xw ps  # Shows actual port
+    ```
+    
+    **Solutions**:
+    
+    <Steps>
+      <Step title="Wait for startup">
+        Large models can take 1-5 minutes to load.
+        
+        Watch logs:
+        ```bash
+        xw logs <instance-id> --follow
+        # Wait for: "Application startup complete"
+        ```
+      </Step>
+      
+      <Step title="Check for crashes">
+        ```bash
+        xw logs <instance-id> | tail -50
+        # Look for error messages
+        ```
+      </Step>
+      
+      <Step title="Verify correct port">
+        ```bash
+        xw ps  # Shows port in PORT column
+        curl http://localhost:<PORT>/v1/models
+        ```
+      </Step>
+    </Steps>
+  </Accordion>
+  
+  <Accordion title="Inference returns errors" icon="exclamation">
+    **Error**: `500 Internal Server Error` from API
+    
+    **Diagnosis**:
+    ```bash
+    # Check runtime logs
+    xw logs <instance-id>
+    ```
+    
+    **Common errors**:
+    
+    <Card title="Invalid input format">
+      **Error in logs**: `ValidationError: prompt is required`
+      
+      **Solution**: Check API request format:
+      ```bash
+      # Correct format
+      curl http://localhost:8000/v1/completions \
+        -H "Content-Type: application/json" \
+        -d '{
+          "model": "qwen2.5-7b-instruct",
+          "prompt": "Hello",
+          "max_tokens": 50
+        }'
+      ```
+    </Card>
+    
+    <Card title="Context length exceeded">
+      **Error in logs**: `Input length exceeds maximum context length`
+      
+      **Solution**: Reduce input length or increase `max_model_len`:
+      ```yaml
+      templates:
+        device_model_vllm:
+          - max_model_len=32768  # Increase from 8192
+      ```
+    </Card>
+    
+    <Card title="Out of memory during inference">
+      **Error in logs**: `RuntimeError: CUDA out of memory`
+      
+      **Solutions**:
+      1. Reduce concurrent requests
+      2. Reduce `max_num_seqs` in runtime params
+      3. Use smaller batch sizes
+    </Card>
+  </Accordion>
+</AccordionGroup>
+
+## Configuration Issues
+
+<AccordionGroup>
+  <Accordion title="Reload fails" icon="rotate">
+    **Error**: `Failed to reload configuration`
+    
+    **Cause**: Syntax error or validation failure in YAML files
+    
+    **Diagnosis**:
+    ```bash
+    # Check configuration files
+    cd ~/.xw/0.0.1/configs/0.0.1/
+    
+    # Validate YAML syntax
+    python3 -c "import yaml; yaml.safe_load(open('models.yaml'))"
+    python3 -c "import yaml; yaml.safe_load(open('devices.yaml'))"
+    ```
+    
+    **Common errors**:
+    
+    <Tabs>
+      <Tab title="YAML Syntax">
+        **Error**: `yaml: line 42: mapping values are not allowed here`
+        
+        **Cause**: Indentation or formatting error
+        
+        **Solution**: Check indentation (use spaces, not tabs):
+        ```yaml
+        # Correct
+        models:
+          - model_id: test
+            source_id: org/test
+        
+        # Wrong - inconsistent indentation
+        models:
+        - model_id: test
+           source_id: org/test
+        ```
+      </Tab>
+      
+      <Tab title="Validation">
+        **Error**: `duplicate model_id: qwen2.5-7b-instruct`
+        
+        **Solution**: Ensure unique model IDs:
+        ```bash
+        # Find duplicates
+        grep "model_id:" configs/0.0.1/models.yaml | sort | uniq -d
+        ```
+      </Tab>
+      
+      <Tab title="Missing Fields">
+        **Error**: `model my-model: source_id is required`
+        
+        **Solution**: Add required fields:
+        ```yaml
+        - model_id: my-model
+          source_id: org/model  # Required!
+          supported_devices:     # Required!
+            ascend-910b:
+              - vllm:docker
+        ```
+      </Tab>
+    </Tabs>
+  </Accordion>
+</AccordionGroup>
+
+## Diagnostic Commands
+
+### Quick Health Check
+
+```bash
+#!/bin/bash
+# XW health check script
+
+echo "=== XW Health Check ==="
+
+echo "\n1. Server status:"
+xw version
+
+echo "\n2. Device detection:"
+xw device list
+
+echo "\n3. Docker status:"
+docker info | grep "Server Version\|Operating System"
+
+echo "\n4. Running instances:"
+xw ps
+
+echo "\n5. NPU status (Ascend):"
+npu-smi info 2>/dev/null || echo "npu-smi not available"
+
+echo "\n6. Configuration files:"
+ls -lh ~/.xw/0.0.1/configs/0.0.1/
+```
+
+### Collect Diagnostics
+
+```bash
+#!/bin/bash
+# Collect XW diagnostics for support
+
+OUTPUT="xw-diagnostics-$(date +%Y%m%d-%H%M%S).tar.gz"
+TMPDIR="/tmp/xw-diag-$$"
+
+mkdir -p "$TMPDIR"
+
+# System info
+uname -a > "$TMPDIR/system.txt"
+lspci -nn > "$TMPDIR/pci-devices.txt"
+
+# XW info
+xw version > "$TMPDIR/xw-version.txt" 2>&1
+xw device list > "$TMPDIR/devices.txt" 2>&1
+xw ps > "$TMPDIR/instances.txt" 2>&1
+
+# Docker info
+docker info > "$TMPDIR/docker-info.txt" 2>&1
+docker ps -a > "$TMPDIR/docker-ps.txt" 2>&1
+
+# NPU info (if available)
+npu-smi info > "$TMPDIR/npu-info.txt" 2>&1
+
+# Configuration (sanitize sensitive data)
+cp -r ~/.xw/0.0.1/configs "$TMPDIR/" 2>/dev/null
+
+# Create archive
+tar -czf "$OUTPUT" -C "$(dirname $TMPDIR)" "$(basename $TMPDIR)"
+rm -rf "$TMPDIR"
+
+echo "Diagnostics saved to: $OUTPUT"
+```
+
+## Getting Help
+
+<CardGroup cols={2}>
+  <Card title="Check Logs" icon="file-lines">
+    ```bash
+    # Instance logs
+    xw logs <instance-id>
+    
+    # Server logs
+    xw logs --system
+    ```
+  </Card>
+  
+  <Card title="Community Support" icon="users">
+    [GitHub Issues](https://github.com/TsingmaoAI/xw-cli/issues)
+    
+    Search for similar issues before creating new ones.
+  </Card>
+  
+  <Card title="Documentation" icon="book">
+    - [Configuration Guide](/configuration/overview)
+    - [CLI Reference](/cli/serve)
+    - [API Reference](/api/overview)
+  </Card>
+  
+  <Card title="Diagnostics" icon="stethoscope">
+    Include when reporting issues:
+    - `xw version` output
+    - `xw device list` output
+    - Relevant log excerpts
+    - Configuration snippets
+  </Card>
+</CardGroup>
+
+<Warning>
+  Always sanitize logs and configurations before sharing publicly. Remove any sensitive information like API keys or internal hostnames.
+</Warning>

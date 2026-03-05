@@ -1,0 +1,117 @@
+---
+title: xw ls
+description: List available and downloaded AI models
+---
+
+## Usage
+
+```bash
+xw ls [flags]
+```
+
+## Description
+
+List models that have been downloaded and are available locally. Use the `-a` flag to show all models supported by your current AI accelerator chip.
+
+## Aliases
+
+- `xw list`
+
+## Options
+
+<ParamField path="-a, --all" type="boolean" default="false">
+  Show all models supported by current chip (includes models not yet downloaded)
+</ParamField>
+
+<ParamField path="-v, --verbose" type="boolean" default="false">
+  Enable verbose logging
+</ParamField>
+
+## Examples
+
+### List downloaded models
+
+```bash
+xw ls
+```
+
+Shows only models that have been downloaded.
+
+### List all supported models
+
+```bash
+xw ls -a
+```
+
+Shows all models supported by your AI accelerator, including those not yet downloaded.
+
+### Using the list alias
+
+```bash
+xw list
+```
+
+Same as `xw ls`.
+
+## Output
+
+### Downloaded models only
+
+```
+MODEL                    SOURCE          TAG       SIZE     DEFAULT ENGINE   MODIFIED
+qwen2-0.5b              modelscope      latest    1.1GB    vllm:docker      2 hours ago
+qwen2.5-7b-instruct     huggingface     latest    15.2GB   vllm:docker      1 day ago
+```
+
+### All supported models (with -a flag)
+
+```
+MODEL                    SOURCE          TAG       SIZE     DEFAULT ENGINE   MODIFIED
+qwen2-0.5b              modelscope      latest    1.1GB    vllm:docker      2 hours ago
+qwen2-1.5b              modelscope      latest    3.2GB    vllm:docker      -
+qwen2.5-7b-instruct     huggingface     latest    15.2GB   vllm:docker      1 day ago
+qwen2.5-14b             huggingface     latest    28.4GB   vllm:docker      -
+
+──────────────────────────────────── Available: 12, Not supported: 3 ────────────────────────────────────
+
+MODEL                    SOURCE          TAG       SIZE     DEFAULT ENGINE   MODIFIED
+llama-3-70b             huggingface     latest    -        mindie:native    -
+gpt-4-turbo             openai          -         -        -                -
+```
+
+Models above the separator line are supported by your current hardware. Models below are not compatible with your AI accelerator.
+
+### No models downloaded
+
+```
+No models downloaded.
+
+Download a model with: xw pull <model>
+List all supported models with: xw ls -a
+```
+
+## Column Descriptions
+
+- **MODEL**: Model name/identifier
+- **SOURCE**: Model source (modelscope, huggingface, etc.)
+- **TAG**: Model version tag
+- **SIZE**: Model size on disk (only shown for downloaded models)
+- **DEFAULT ENGINE**: Default inference engine (e.g., `vllm:docker`, `mindie:native`)
+- **MODIFIED**: Time since last modification (only shown for downloaded models)
+
+## Understanding Model Status
+
+- **Downloaded models**: Show size and modification time
+- **Available but not downloaded**: Show `-` for size and modified time
+- **Not supported**: Listed below the separator line when using `-a`
+
+## Related Commands
+
+- [`xw pull`](/cli/pull) - Download a model
+- [`xw run`](/cli/run) - Run a model
+- [`xw ps`](/cli/ps) - List running instances
+
+## See Also
+
+- [Supported Models](/guides/supported-models) - Browse available models
+- [Model Management](/concepts/model-management) - Learn about model sources

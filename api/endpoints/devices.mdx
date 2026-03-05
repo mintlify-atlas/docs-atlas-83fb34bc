@@ -1,0 +1,306 @@
+---
+title: 'Device Information'
+description: 'Query AI accelerator devices and hardware capabilities'
+---
+
+## GET /api/devices/list
+
+Retrieve a list of AI accelerator devices detected on the server machine.
+
+### Request
+
+```bash
+curl http://localhost:11581/api/devices/list
+```
+
+Also accepts POST requests with empty body for compatibility.
+
+### Response
+
+<ResponseField name="devices" type="Device[]" required>
+  Array of detected devices with detailed chip information
+</ResponseField>
+
+### Device Object
+
+The device object contains detailed information about each physical AI accelerator chip:
+
+<ResponseField name="id" type="string" required>
+  Device identifier (e.g., `"0000:00:0d.0"` for PCIe address)
+</ResponseField>
+
+<ResponseField name="name" type="string" required>
+  Human-readable device name (e.g., `"Ascend 910B"`)
+</ResponseField>
+
+<ResponseField name="type" type="string" required>
+  Device type identifier (e.g., `"ascend-910b"`, `"ascend-310p"`)
+</ResponseField>
+
+<ResponseField name="vendor" type="string" required>
+  Device vendor (e.g., `"huawei"`)
+</ResponseField>
+
+<ResponseField name="status" type="string" required>
+  Device status: `"available"`, `"busy"`, or `"unavailable"`
+</ResponseField>
+
+### Example Response
+
+```json
+{
+  "devices": [
+    {
+      "id": "0000:00:0d.0",
+      "name": "Ascend 910B",
+      "type": "ascend-910b",
+      "vendor": "huawei",
+      "status": "available"
+    },
+    {
+      "id": "0000:00:0e.0",
+      "name": "Ascend 910B",
+      "type": "ascend-910b",
+      "vendor": "huawei",
+      "status": "available"
+    }
+  ]
+}
+```
+
+### Use Cases
+
+- Discover available AI accelerators before model deployment
+- Verify hardware compatibility for specific models
+- Monitor device availability and status
+- Display hardware information in dashboards
+
+---
+
+## GET /api/devices/supported
+
+Retrieve a list of device types supported by the server configuration.
+
+### Request
+
+```bash
+curl http://localhost:11581/api/devices/supported
+```
+
+Also accepts POST requests:
+
+```bash
+curl -X POST http://localhost:11581/api/devices/supported \
+  -H "Content-Type: application/json" \
+  -d '{"type": "all"}'
+```
+
+### Request Body (POST only)
+
+<ParamField body="type" type="string" optional>
+  Device type filter. If empty or `"all"`, returns all supported types.
+</ParamField>
+
+### Response
+
+<ResponseField name="device_types" type="string[]" required>
+  Array of supported device type identifiers
+</ResponseField>
+
+### Example Response
+
+```json
+{
+  "device_types": [
+    "ascend-910b",
+    "ascend-310p",
+    "ascend-910a"
+  ]
+}
+```
+
+### Device Type Identifiers
+
+Device types use precise chip model identifiers:
+
+- **Huawei Ascend**:
+  - `ascend-910b` - Ascend 910B (training/inference)
+  - `ascend-910a` - Ascend 910A (training/inference)
+  - `ascend-310p` - Ascend 310P (inference-optimized)
+  - `ascend-310` - Ascend 310 (inference)
+
+These identifiers are used throughout the API for:
+- Model compatibility filtering
+- Backend selection
+- Configuration management
+
+---
+
+## Device Detection
+
+The XW server automatically detects AI accelerators at startup using:
+
+1. **PCIe Device Scanning**: Enumerates PCIe devices by vendor/device ID
+2. **Driver Verification**: Checks for installed drivers (e.g., Ascend driver)
+3. **Configuration Matching**: Maps detected hardware to device types from `devices.yaml`
+
+### Detection Methods by Vendor
+
+#### Huawei Ascend
+
+```bash
+# Check for Ascend devices
+lspci | grep -i ascend
+
+# Verify driver installation
+ls /usr/local/Ascend/driver/
+
+# Check NPU status
+npu-smi info
+```
+
+#### Other Vendors
+
+Support for additional AI accelerators depends on:
+- Device configuration files in config package
+- Driver availability
+- Backend runtime compatibility
+
+---
+
+## Integration Examples
+
+### Python: List Devices
+
+```python
+import requests
+
+response = requests.get("http://localhost:11581/api/devices/list")
+data = response.json()
+
+print(f"Found {len(data['devices'])} devices:")
+for device in data["devices"]:
+    print(f"  {device['name']} ({device['type']}) - {device['status']}")
+```
+
+### Go: Check Device Compatibility
+
+```go
+package main
+
+import (
+    "encoding/json"
+    "fmt"
+    "net/http"
+)
+
+type DeviceListResponse struct {
+    Devices []Device `json:"devices"`
+}
+
+type Device struct {
+    ID     string `json:"id"`
+    Name   string `json:"name"`
+    Type   string `json:"type"`
+    Vendor string `json:"vendor"`
+    Status string `json:"status"`
+}
+
+func main() {
+    resp, err := http.Get("http://localhost:11581/api/devices/list")
+    if err != nil {
+        panic(err)
+    }
+    defer resp.Body.Close()
+
+    var result DeviceListResponse
+    json.NewDecoder(resp.Body).Decode(&result)
+
+    fmt.Printf("Detected %d devices\n", len(result.Devices))
+    for _, dev := range result.Devices {
+        fmt.Printf("  %s: %s [%s]\n", dev.Type, dev.Name, dev.Status)
+    }
+}
+```
+
+### JavaScript: Display Device Info
+
+```javascript
+fetch('http://localhost:11581/api/devices/list')
+  .then(res => res.json())
+  .then(data => {
+    console.log(`Found ${data.devices.length} devices`);
+    
+    data.devices.forEach(device => {
+      console.log(`${device.name}:`);
+      console.log(`  Type: ${device.type}`);
+      console.log(`  Status: ${device.status}`);
+    });
+  })
+  .catch(err => console.error('Failed to fetch devices:', err));
+```
+
+---
+
+## Device Status Values
+
+<ResponseField name="available" type="status">
+  Device is detected, drivers are loaded, and it's ready for use
+</ResponseField>
+
+<ResponseField name="busy" type="status">
+  Device is currently in use by a running model instance
+</ResponseField>
+
+<ResponseField name="unavailable" type="status">
+  Device is detected but not accessible (driver issues, permissions, etc.)
+</ResponseField>
+
+---
+
+## Error Responses
+
+```json
+{
+  "error": "Failed to list devices",
+  "code": "500"
+}
+```
+
+### Common Error Codes
+
+- `405` - Method not allowed
+- `500` - Failed to detect or enumerate devices
+
+---
+
+## Configuration
+
+Device detection is configured via `devices.yaml` in the config package:
+
+```yaml
+devices:
+  - name: "Ascend 910B"
+    type: "ascend-910b"
+    vendor: "huawei"
+    pci_ids:
+      - "19e5:d801"
+    detection:
+      method: "pci"
+      driver_path: "/usr/local/Ascend/driver"
+```
+
+This configuration is managed by the config package versioning system.
+
+---
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card title="Model List" icon="cube" href="/api/endpoints/models">
+    Filter models by device compatibility
+  </Card>
+  <Card title="Runtime Start" icon="play" href="/api/endpoints/runtime">
+    Start models on specific devices
+  </Card>
+</CardGroup>

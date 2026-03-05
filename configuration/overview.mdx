@@ -1,0 +1,296 @@
+---
+title: Configuration Overview
+description: Understand the XW CLI configuration system and versioned configuration management
+---
+
+XW CLI uses a versioned configuration system to manage device definitions, model catalogs, and runtime parameters. This architecture allows you to update configurations independently from the CLI binary.
+
+## Configuration Architecture
+
+The configuration system consists of three main components:
+
+<CardGroup cols={3}>
+  <Card title="Device Configuration" icon="microchip" href="/configuration/devices">
+    Define AI accelerator chips, vendors, and hardware topology
+  </Card>
+  <Card title="Model Configuration" icon="brain" href="/configuration/models">
+    Catalog of AI models with device compatibility mappings
+  </Card>
+  <Card title="Runtime Parameters" icon="sliders" href="/configuration/runtime-params">
+    Template-based parameter configurations for model deployments
+  </Card>
+</CardGroup>
+
+## Configuration Versioning
+
+### Version Structure
+
+Configurations are organized by semantic version numbers:
+
+```bash
+~/.xw/
+├── 0.0.1/              # Configuration version 0.0.1
+│   ├── devices.yaml
+│   ├── models.yaml
+│   └── runtime_params.yaml
+├── 0.0.2/              # Configuration version 0.0.2
+│   ├── devices.yaml
+│   ├── models.yaml
+│   └── runtime_params.yaml
+└── data/
+    └── server.conf     # Active version pointer
+```
+
+### Package Registry
+
+Configuration versions are distributed through a centralized package registry (`packages.json`):
+
+```json
+{
+  "packages": [
+    {
+      "version": "0.0.3",
+      "name": "0.0.3",
+      "description": "support Qwen3.5 on Ascend 910B with vLLM & support Omni-infer on Ascend 910B",
+      "release_date": "2026-02-27",
+      "download_url": "https://xw.tsingmao.com/packages/0.0.3.tar.gz",
+      "min_xw_version": "0.0.1"
+    }
+  ]
+}
+```
+
+### Version Compatibility
+
+Each configuration package specifies a minimum CLI version requirement:
+
+- **`min_xw_version`**: Minimum required XW CLI binary version
+- **Backward compatibility**: Newer CLI versions can use older configurations
+- **Forward compatibility**: Configuration updates are independent of CLI updates
+
+## Configuration Locations
+
+### Default Paths
+
+<AccordionGroup>
+  <Accordion title="User Configuration Directory">
+    **Path**: `~/.xw/{version}/`
+    
+    User-specific configurations loaded by default. This is the standard location for normal installations.
+    
+    ```bash
+    ~/.xw/0.0.1/devices.yaml
+    ~/.xw/0.0.1/models.yaml
+    ~/.xw/0.0.1/runtime_params.yaml
+    ```
+  </Accordion>
+
+  <Accordion title="System Configuration Directory">
+    **Path**: `/etc/xw/{version}/`
+    
+    System-wide configurations for multi-user deployments. Requires root access to modify.
+    
+    ```bash
+    /etc/xw/0.0.1/devices.yaml
+    /etc/xw/0.0.1/models.yaml
+    /etc/xw/0.0.1/runtime_params.yaml
+    ```
+  </Accordion>
+
+  <Accordion title="Custom Configuration Path">
+    Use the `--config` flag to specify a custom configuration directory:
+    
+    ```bash
+    xw server start --config /custom/path/0.0.1
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Configuration Loading Priority
+
+1. **Explicit path** via `--config` flag (highest priority)
+2. **User directory** at `~/.xw/{version}/`
+3. **System directory** at `/etc/xw/{version}/` (lowest priority)
+
+## Managing Configuration Versions
+
+### List Available Versions
+
+View all configuration versions in the registry:
+
+```bash
+xw config list-remote
+```
+
+### Install a Configuration Version
+
+Download and install a specific configuration version:
+
+```bash
+xw config install 0.0.3
+```
+
+The CLI automatically:
+- Downloads the package from the registry
+- Verifies SHA256 checksum
+- Extracts to `~/.xw/0.0.3/`
+- Validates configuration syntax
+
+### Switch Configuration Version
+
+Change the active configuration version:
+
+```bash
+xw config use 0.0.3
+xw server restart  # Apply changes
+```
+
+### View Current Version
+
+Check which configuration version is active:
+
+```bash
+xw config current
+```
+
+### List Installed Versions
+
+See all locally installed configuration versions:
+
+```bash
+xw config list
+```
+
+## Configuration Schema
+
+### Version Field
+
+All configuration files include a `version` field specifying the schema version:
+
+```yaml
+version: "1.0"
+```
+
+This is distinct from the configuration package version and represents the YAML schema structure version.
+
+### Validation
+
+Configurations are validated on load:
+
+<Tabs>
+  <Tab title="Devices Validation">
+    - Version field present
+    - At least one vendor defined
+    - Valid vendor/device IDs (hex format)
+    - No duplicate `config_key` values
+    - Required fields present for each chip model
+  </Tab>
+  
+  <Tab title="Models Validation">
+    - Version field present
+    - At least one model defined
+    - No duplicate `model_id` values
+    - Valid `source_id` format
+    - Engine format: `backend:mode` (e.g., `vllm:docker`)
+    - At least one supported device per model
+  </Tab>
+  
+  <Tab title="Runtime Params Validation">
+    - No duplicate template names
+    - Parameters in `key=value` format
+    - Template naming: `{chip}_{model}_{backend}`
+    - Keys cannot be empty
+  </Tab>
+</Tabs>
+
+## Configuration Updates
+
+### When to Update
+
+Configuration updates are needed when:
+
+- **New hardware support**: Adding support for new AI accelerator chips
+- **New models**: Adding new AI models to the catalog
+- **Bug fixes**: Fixing incorrect device IDs, runtime parameters, or configurations
+- **Performance tuning**: Updating runtime parameter templates for better performance
+
+### Update Process
+
+1. **Check for updates**:
+   ```bash
+   xw config list-remote
+   ```
+
+2. **Install new version**:
+   ```bash
+   xw config install 0.0.3
+   ```
+
+3. **Switch to new version**:
+   ```bash
+   xw config use 0.0.3
+   ```
+
+4. **Restart server**:
+   ```bash
+   xw server restart
+   ```
+
+### Rollback
+
+If issues occur after an update, roll back to a previous version:
+
+```bash
+xw config use 0.0.2
+xw server restart
+```
+
+All installed versions remain available for quick rollback.
+
+## Configuration Caching
+
+### Cache Behavior
+
+Configurations are loaded once at server startup and cached in memory:
+
+- **Device configuration**: Cached after first load
+- **Model configuration**: Cached after first load  
+- **Runtime parameters**: Cached after first load
+
+### Cache Invalidation
+
+Caches are invalidated when:
+
+- Server restarts
+- Configuration version changes
+- Explicit reload is triggered (development mode)
+
+<Note>
+  Configuration changes require a server restart to take effect. Hot-reloading is not supported in production mode.
+</Note>
+
+## Best Practices
+
+<Check>Keep configurations in version control for production deployments</Check>
+<Check>Test configuration updates in a non-production environment first</Check>
+<Check>Document custom modifications to configuration files</Check>
+<Check>Regularly check for configuration updates</Check>
+<Check>Use explicit version pinning for critical deployments</Check>
+
+<Warning>
+  Modifying configuration files directly while the server is running has no effect until restart. Always restart the server after configuration changes.
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card title="Device Configuration" icon="microchip" href="/configuration/devices">
+    Configure hardware devices and chip models
+  </Card>
+  <Card title="Model Configuration" icon="brain" href="/configuration/models">
+    Add and manage AI model definitions
+  </Card>
+  <Card title="Runtime Parameters" icon="sliders" href="/configuration/runtime-params">
+    Fine-tune model deployment parameters
+  </Card>
+</CardGroup>

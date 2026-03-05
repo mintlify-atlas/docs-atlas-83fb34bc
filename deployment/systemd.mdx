@@ -1,0 +1,572 @@
+---
+title: 'SystemD Service Deployment'
+description: 'Deploy XW as a system service with SystemD for production environments'
+icon: 'server'
+---
+
+## Overview
+
+SystemD provides robust service management for XW server deployments. This deployment method is ideal for production environments requiring:
+
+- Automatic startup on system boot
+- Service supervision and automatic restart on failure
+- Centralized logging via journald
+- Resource limit management
+- Multi-user system integration
+
+## Prerequisites
+
+<Info>
+SystemD deployment requires root privileges and is available on most modern Linux distributions.
+</Info>
+
+- Linux system with SystemD (CentOS 7+, Ubuntu 16.04+, Debian 9+)
+- Root or sudo access
+- Docker daemon installed and running (for inference runtime)
+- Go 1.19+ for building from source
+
+## System-Wide Installation
+
+<Steps>
+  <Step title="Build the binary">
+    Clone the repository and build XW:
+    
+    ```bash
+    git clone https://github.com/tsingmao/xw.git
+    cd xw
+    make build
+    ```
+    
+    This creates the binary at `bin/xw`.
+  </Step>
+
+  <Step title="Install system-wide with sudo">
+    Run the install target to deploy XW system-wide:
+    
+    ```bash
+    sudo make install
+    ```
+    
+    This performs the following operations:
+    - Installs binary to `/usr/local/bin/xw`
+    - Creates `xw` system user (no login, no home directory)
+    - Creates directory structure:
+      - `/etc/xw/` - Configuration files
+      - `/var/lib/xw/` - Data directory and models
+      - `/var/log/xw/` - Log directory
+    - Installs configuration files (devices.yaml, models.yaml, runtime_params.yaml)
+    - Installs SystemD service file to `/etc/systemd/system/xw-server.service`
+    - Reloads SystemD daemon
+    
+    <Warning>
+    Existing binaries at `/usr/local/bin/xw` will be overwritten.
+    </Warning>
+  </Step>
+
+  <Step title="Start and enable the service">
+    Start the XW service and enable it to start on boot:
+    
+    ```bash
+    sudo systemctl start xw-server
+    sudo systemctl enable xw-server
+    ```
+    
+    Verify the service is running:
+    
+    ```bash
+    sudo systemctl status xw-server
+    ```
+  </Step>
+</Steps>
+
+## Service Configuration
+
+### SystemD Unit File
+
+The service is configured in `/etc/systemd/system/xw-server.service`:
+
+```ini systemd/xw-server.service
+[Unit]
+Description=XW AI Inference Server
+Documentation=https://github.com/tsingmao/xw
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/xw serve --host 127.0.0.1
+
+# Restart configuration
+Restart=on-failure
+RestartSec=5s
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=xw
+
+[Install]
+WantedBy=multi-user.target
+```
+
+### Key Configuration Options
+
+<AccordionGroup>
+  <Accordion title="Service Behavior">
+    - **Type=simple**: Service is ready immediately after fork
+    - **Restart=on-failure**: Automatic restart if service crashes
+    - **RestartSec=5s**: Wait 5 seconds before restarting
+    - **After/Wants**: Ensures network is available before starting
+  </Accordion>
+
+  <Accordion title="Resource Limits">
+    - **LimitNOFILE=65536**: Maximum open files (for concurrent model instances)
+    - **LimitNPROC=4096**: Maximum processes (for Docker containers)
+    
+    Adjust these based on your deployment scale:
+    ```bash
+    sudo systemctl edit xw-server
+    ```
+    
+    Add overrides:
+    ```ini
+    [Service]
+    LimitNOFILE=131072
+    LimitNPROC=8192
+    ```
+  </Accordion>
+
+  <Accordion title="Logging Configuration">
+    - **StandardOutput/StandardError=journal**: Logs to SystemD journal
+    - **SyslogIdentifier=xw**: Tag for log filtering
+    
+    All output is captured by journald for centralized log management.
+  </Accordion>
+</AccordionGroup>
+
+## Directory Structure
+
+SystemD installation creates the following directory layout:
+
+```
+/usr/local/bin/
+└── xw                           # Main binary
+
+/etc/xw/
+├── devices.yaml                 # Device configuration
+├── models.yaml                  # Model registry
+└── runtime_params.yaml          # Runtime parameters
+
+/var/lib/xw/
+├── models/                      # Downloaded model files
+└── [runtime data]
+
+/var/log/xw/
+└── [application logs]           # Persistent logs (optional)
+```
+
+<Note>
+The `xw` system user has ownership of `/var/lib/xw/` and `/var/log/xw/` with restricted permissions.
+</Note>
+
+## Service Management
+
+### Start/Stop/Restart
+
+```bash
+# Start the service
+sudo systemctl start xw-server
+
+# Stop the service
+sudo systemctl stop xw-server
+
+# Restart the service
+sudo systemctl restart xw-server
+
+# Reload configuration (if supported)
+sudo systemctl reload xw-server
+```
+
+Alternatively, use the Makefile shortcuts:
+
+```bash
+make start    # Start service
+make stop     # Stop service
+make restart  # Restart service
+make status   # Check status
+```
+
+### Enable/Disable Auto-Start
+
+```bash
+# Enable service to start on boot
+sudo systemctl enable xw-server
+
+# Disable auto-start
+sudo systemctl disable xw-server
+
+# Check if enabled
+sudo systemctl is-enabled xw-server
+```
+
+## Log Management
+
+### Viewing Logs
+
+SystemD captures all service output in the journal:
+
+```bash
+# View recent logs
+sudo journalctl -u xw-server
+
+# Follow logs in real-time
+sudo journalctl -u xw-server -f
+
+# Show logs since boot
+sudo journalctl -u xw-server -b
+
+# Show logs from last hour
+sudo journalctl -u xw-server --since "1 hour ago"
+
+# Show only errors
+sudo journalctl -u xw-server -p err
+```
+
+Makefile shortcut:
+
+```bash
+make logs  # Follow logs in real-time
+```
+
+### Log Rotation
+
+SystemD journal handles log rotation automatically. Configure retention:
+
+```bash
+# Edit journal configuration
+sudo nano /etc/systemd/journald.conf
+```
+
+Recommended settings:
+
+```ini
+[Journal]
+SystemMaxUse=1G        # Maximum disk usage
+SystemMaxFileSize=100M # Maximum single file size
+MaxRetentionSec=7d     # Keep logs for 7 days
+```
+
+Restart journald after changes:
+
+```bash
+sudo systemctl restart systemd-journald
+```
+
+### Log Locations
+
+- **Journal logs**: `/var/log/journal/` (binary format)
+- **Application logs**: `/var/log/xw/` (if configured)
+- **Docker container logs**: Accessible via `docker logs` or XW API
+
+## Monitoring
+
+### Service Status
+
+Check service health:
+
+```bash
+sudo systemctl status xw-server
+```
+
+Output includes:
+- Active state (active/inactive/failed)
+- Process ID and uptime
+- Memory and CPU usage
+- Recent log entries
+
+### Health Checks
+
+Monitor XW server health via API:
+
+```bash
+# Check server health
+curl http://localhost:7777/health
+
+# List running instances
+xw ps
+
+# View device status
+xw device list
+```
+
+### Process Monitoring
+
+```bash
+# Show resource usage
+systemctl show xw-server --property=MainPID,MemoryCurrent,CPUUsageNSec
+
+# Watch resource usage
+watch -n 1 'systemctl status xw-server | grep -E "Memory|CPU"'
+```
+
+## Configuration Management
+
+### Update Configuration
+
+Configuration files are located in `/etc/xw/`:
+
+```bash
+# Edit device configuration
+sudo nano /etc/xw/devices.yaml
+
+# Edit model registry
+sudo nano /etc/xw/models.yaml
+
+# Edit runtime parameters
+sudo nano /etc/xw/runtime_params.yaml
+```
+
+Reload configuration without restarting:
+
+```bash
+xw config reload
+```
+
+Or restart the service:
+
+```bash
+sudo systemctl restart xw-server
+```
+
+### Bind Address Configuration
+
+By default, XW binds to `127.0.0.1` (localhost only). To allow external access:
+
+```bash
+sudo systemctl edit xw-server
+```
+
+Override the ExecStart:
+
+```ini
+[Service]
+ExecStart=
+ExecStart=/usr/local/bin/xw serve --host 0.0.0.0 --port 7777
+```
+
+<Warning>
+Binding to `0.0.0.0` exposes the service to your network. Implement proper firewall rules and authentication.
+</Warning>
+
+## Security Considerations
+
+### Service User Isolation
+
+The service runs as the `xw` system user (created during installation):
+- No login shell
+- No home directory
+- Restricted permissions
+- Ownership of data directories only
+
+This limits the impact of potential security vulnerabilities.
+
+### File Permissions
+
+```bash
+# Configuration files (read by xw user)
+/etc/xw/            - owned by root:root (644)
+
+# Data directories (written by xw user)
+/var/lib/xw/        - owned by xw:xw (755)
+/var/log/xw/        - owned by xw:xw (755)
+```
+
+### Docker Socket Access
+
+The `xw` user needs access to Docker socket. Grant permissions:
+
+```bash
+# Add xw user to docker group
+sudo usermod -aG docker xw
+
+# Or adjust socket permissions
+sudo chmod 666 /var/run/docker.sock
+```
+
+<Warning>
+Docker socket access grants significant privileges. Consider Docker API authentication for production.
+</Warning>
+
+### Firewall Configuration
+
+Restrict access to XW server:
+
+```bash
+# Allow only localhost access (default)
+No firewall rules needed
+
+# Allow access from specific network
+sudo firewall-cmd --permanent --add-rich-rule='rule family="ipv4" source address="192.168.1.0/24" port protocol="tcp" port="7777" accept'
+sudo firewall-cmd --reload
+```
+
+## Uninstallation
+
+### Clean Removal
+
+```bash
+# Stop and disable service
+sudo systemctl stop xw-server
+sudo systemctl disable xw-server
+
+# Run uninstall target
+sudo make uninstall
+```
+
+This removes:
+- Binary (`/usr/local/bin/xw`)
+- SystemD service file
+- Reloads SystemD daemon
+
+<Note>
+Data directories `/var/lib/xw/` and `/var/log/xw/` are preserved. Remove manually if needed:
+```bash
+sudo rm -rf /var/lib/xw /var/log/xw
+sudo userdel xw
+```
+</Note>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Service fails to start">
+    Check service status and logs:
+    ```bash
+    sudo systemctl status xw-server
+    sudo journalctl -u xw-server -n 50
+    ```
+    
+    Common issues:
+    - Docker daemon not running: `sudo systemctl start docker`
+    - Port already in use: Check with `netstat -tlnp | grep 7777`
+    - Permission issues: Verify `xw` user in `docker` group
+  </Accordion>
+
+  <Accordion title="Service restarts frequently">
+    Check for crash loops:
+    ```bash
+    sudo journalctl -u xw-server | grep -i "error\|fail\|crash"
+    ```
+    
+    Possible causes:
+    - Configuration errors in `/etc/xw/*.yaml`
+    - Insufficient resources (memory, disk)
+    - Docker daemon issues
+  </Accordion>
+
+  <Accordion title="Cannot access models">
+    Verify directory permissions:
+    ```bash
+    ls -la /var/lib/xw/models
+    ```
+    
+    Fix ownership:
+    ```bash
+    sudo chown -R xw:xw /var/lib/xw
+    ```
+  </Accordion>
+
+  <Accordion title="High memory usage">
+    Check running containers:
+    ```bash
+    docker stats
+    xw ps
+    ```
+    
+    Stop unused instances:
+    ```bash
+    xw stop <instance-alias>
+    xw remove <instance-alias>
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Upgrading
+
+### In-Place Upgrade
+
+<Steps>
+  <Step title="Pull latest changes">
+    ```bash
+    cd xw
+    git pull origin main
+    ```
+  </Step>
+
+  <Step title="Rebuild and reinstall">
+    ```bash
+    make clean
+    make build
+    sudo make install
+    ```
+  </Step>
+
+  <Step title="Restart service">
+    ```bash
+    sudo systemctl restart xw-server
+    ```
+    
+    Verify the new version:
+    ```bash
+    xw version
+    ```
+  </Step>
+</Steps>
+
+<Note>
+Running model instances are preserved during upgrades. SystemD will restore them after restart.
+</Note>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Resource Limits" icon="gauge-high">
+    Set appropriate limits in service file based on your deployment scale and available resources.
+  </Card>
+  
+  <Card title="Log Retention" icon="clock-rotate-left">
+    Configure journal retention to balance observability and disk usage (recommended: 7-14 days).
+  </Card>
+  
+  <Card title="Backup Configuration" icon="floppy-disk">
+    Regularly backup `/etc/xw/` directory and model metadata from `/var/lib/xw/`.
+  </Card>
+  
+  <Card title="Monitor Health" icon="heart-pulse">
+    Set up automated health checks and alerting using SystemD service status or XW API.
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Docker Deployment" icon="docker" href="/deployment/docker">
+    Learn about Docker-based deployment options
+  </Card>
+  
+  <Card title="Configuration" icon="gear" href="/configuration/overview">
+    Detailed configuration reference
+  </Card>
+  
+  <Card title="Troubleshooting" icon="wrench" href="/guides/troubleshooting">
+    Common issues and solutions
+  </Card>
+  
+  <Card title="API Reference" icon="code" href="/api/overview">
+    Explore the REST API
+  </Card>
+</CardGroup>

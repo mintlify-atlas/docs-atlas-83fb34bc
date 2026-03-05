@@ -1,0 +1,527 @@
+---
+title: 'Chat Completions'
+description: 'POST /v1/chat/completions - OpenAI-compatible chat completion endpoint'
+---
+
+## POST /v1/chat/completions
+
+Generate chat completions using a running model instance. This endpoint is fully compatible with OpenAI's chat completions API.
+
+<Note>
+You must start a model instance first using `/api/runtime/start` before making chat requests.
+</Note>
+
+## Request
+
+### Headers
+
+```
+Content-Type: application/json
+```
+
+### Body Parameters
+
+<ParamField body="model" type="string" required>
+  Model identifier or instance alias (e.g., `"qwen2-0.5b"`, `"my-chat-model"`)
+</ParamField>
+
+<ParamField body="messages" type="array" required>
+  Array of message objects representing the conversation history
+</ParamField>
+
+<ParamField body="max_tokens" type="integer" optional>
+  Maximum number of tokens to generate in the completion
+</ParamField>
+
+<ParamField body="temperature" type="number" optional>
+  Sampling temperature between 0 and 2. Higher values produce more random output. Default: `0.7`
+</ParamField>
+
+<ParamField body="top_p" type="number" optional>
+  Nucleus sampling parameter (0.0 to 1.0). Default: `0.9`
+</ParamField>
+
+<ParamField body="top_k" type="integer" optional>
+  Top-K sampling parameter. Limits vocabulary to top K tokens.
+</ParamField>
+
+<ParamField body="stream" type="boolean" default="false">
+  Enable Server-Sent Events (SSE) streaming
+</ParamField>
+
+<ParamField body="stop" type="string | array" optional>
+  Stop sequences where generation should halt
+</ParamField>
+
+<ParamField body="presence_penalty" type="number" optional>
+  Penalize tokens that have appeared (-2.0 to 2.0)
+</ParamField>
+
+<ParamField body="frequency_penalty" type="number" optional>
+  Penalize tokens based on frequency (-2.0 to 2.0)
+</ParamField>
+
+<ParamField body="tools" type="array" optional>
+  Tool/function definitions for function calling
+</ParamField>
+
+<ParamField body="tool_choice" type="string | object" optional>
+  Control tool usage: `"auto"`, `"none"`, or specific tool
+</ParamField>
+
+### Message Object
+
+<ParamField name="role" type="string" required>
+  Message role: `"system"`, `"user"`, or `"assistant"`
+</ParamField>
+
+<ParamField name="content" type="string | array" required>
+  Message content (text or structured content with images)
+</ParamField>
+
+<ParamField name="name" type="string" optional>
+  Name of the message author
+</ParamField>
+
+<ParamField name="tool_calls" type="array" optional>
+  Tool calls made by the assistant
+</ParamField>
+
+<ParamField name="tool_call_id" type="string" optional>
+  ID of the tool call this message is responding to
+</ParamField>
+
+## Response (Non-Streaming)
+
+### Response Fields
+
+<ResponseField name="id" type="string" required>
+  Unique chat completion identifier
+</ResponseField>
+
+<ResponseField name="object" type="string" required>
+  Object type, always `"chat.completion"`
+</ResponseField>
+
+<ResponseField name="created" type="integer" required>
+  Unix timestamp of creation
+</ResponseField>
+
+<ResponseField name="model" type="string" required>
+  Model used for generation
+</ResponseField>
+
+<ResponseField name="choices" type="array" required>
+  Array of completion choices
+</ResponseField>
+
+<ResponseField name="usage" type="object" required>
+  Token usage statistics
+</ResponseField>
+
+### Choice Object
+
+<ResponseField name="index" type="integer" required>
+  Choice index (0 for single responses)
+</ResponseField>
+
+<ResponseField name="message" type="object" required>
+  Generated message object
+</ResponseField>
+
+<ResponseField name="finish_reason" type="string" required>
+  Why generation stopped: `"stop"`, `"length"`, `"tool_calls"`, or `"content_filter"`
+</ResponseField>
+
+### Usage Object
+
+<ResponseField name="prompt_tokens" type="integer" required>
+  Number of tokens in the prompt
+</ResponseField>
+
+<ResponseField name="completion_tokens" type="integer" required>
+  Number of tokens in the completion
+</ResponseField>
+
+<ResponseField name="total_tokens" type="integer" required>
+  Total tokens (prompt + completion)
+</ResponseField>
+
+## Examples
+
+### Basic Chat
+
+```bash
+curl -X POST http://localhost:11581/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "qwen2-0.5b",
+    "messages": [
+      {"role": "system", "content": "You are a helpful assistant."},
+      {"role": "user", "content": "What is the capital of France?"}
+    ],
+    "max_tokens": 100
+  }'
+```
+
+### Response
+
+```json
+{
+  "id": "chatcmpl-abc123",
+  "object": "chat.completion",
+  "created": 1709640000,
+  "model": "qwen2-0.5b",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "The capital of France is Paris."
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 20,
+    "completion_tokens": 8,
+    "total_tokens": 28
+  }
+}
+```
+
+### Multi-Turn Conversation
+
+```bash
+curl -X POST http://localhost:11581/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "qwen2-0.5b",
+    "messages": [
+      {"role": "system", "content": "You are a helpful assistant."},
+      {"role": "user", "content": "Tell me a joke."},
+      {"role": "assistant", "content": "Why did the chicken cross the road? To get to the other side!"},
+      {"role": "user", "content": "That was terrible. Tell me a better one."}
+    ],
+    "temperature": 0.8
+  }'
+```
+
+### With Temperature Control
+
+```bash
+curl -X POST http://localhost:11581/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "qwen2-0.5b",
+    "messages": [
+      {"role": "user", "content": "Write a creative story about a robot."}
+    ],
+    "temperature": 1.2,
+    "max_tokens": 200
+  }'
+```
+
+## Streaming Mode
+
+Enable streaming with `"stream": true` to receive incremental responses:
+
+```bash
+curl -X POST http://localhost:11581/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Accept: text/event-stream" \
+  -N \
+  -d '{
+    "model": "qwen2-0.5b",
+    "messages": [{"role": "user", "content": "Tell me a story"}],
+    "stream": true
+  }'
+```
+
+### Streaming Response Format
+
+```
+data: {"id":"chatcmpl-abc123","object":"chat.completion.chunk","created":1709640000,"model":"qwen2-0.5b","choices":[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-abc123","object":"chat.completion.chunk","created":1709640000,"model":"qwen2-0.5b","choices":[{"index":0,"delta":{"content":"Once"},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-abc123","object":"chat.completion.chunk","created":1709640000,"model":"qwen2-0.5b","choices":[{"index":0,"delta":{"content":" upon"},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-abc123","object":"chat.completion.chunk","created":1709640000,"model":"qwen2-0.5b","choices":[{"index":0,"delta":{"content":" a"},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-abc123","object":"chat.completion.chunk","created":1709640000,"model":"qwen2-0.5b","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
+
+data: [DONE]
+```
+
+### Python Streaming Client
+
+```python
+import requests
+import json
+
+url = "http://localhost:11581/v1/chat/completions"
+payload = {
+    "model": "qwen2-0.5b",
+    "messages": [
+        {"role": "user", "content": "Tell me a story"}
+    ],
+    "stream": True
+}
+
+response = requests.post(url, json=payload, stream=True)
+
+for line in response.iter_lines():
+    if line:
+        line = line.decode('utf-8')
+        if line.startswith('data: '):
+            data = line[6:]
+            if data == '[DONE]':
+                break
+            try:
+                chunk = json.loads(data)
+                delta = chunk['choices'][0]['delta']
+                if 'content' in delta:
+                    print(delta['content'], end='', flush=True)
+            except json.JSONDecodeError:
+                continue
+
+print()  # New line at end
+```
+
+### OpenAI Python SDK
+
+The endpoint is compatible with OpenAI's official Python SDK:
+
+```python
+from openai import OpenAI
+
+# Point to local XW server
+client = OpenAI(
+    base_url="http://localhost:11581/v1",
+    api_key="not-needed"  # XW doesn't require auth
+)
+
+# Non-streaming
+response = client.chat.completions.create(
+    model="qwen2-0.5b",
+    messages=[
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": "What is AI?"}
+    ]
+)
+print(response.choices[0].message.content)
+
+# Streaming
+stream = client.chat.completions.create(
+    model="qwen2-0.5b",
+    messages=[{"role": "user", "content": "Tell me a story"}],
+    stream=True
+)
+
+for chunk in stream:
+    if chunk.choices[0].delta.content:
+        print(chunk.choices[0].delta.content, end='', flush=True)
+```
+
+### Node.js with OpenAI SDK
+
+```javascript
+const OpenAI = require('openai');
+
+const openai = new OpenAI({
+  baseURL: 'http://localhost:11581/v1',
+  apiKey: 'not-needed'
+});
+
+async function main() {
+  // Non-streaming
+  const response = await openai.chat.completions.create({
+    model: 'qwen2-0.5b',
+    messages: [
+      { role: 'system', content: 'You are a helpful assistant.' },
+      { role: 'user', content: 'What is AI?' }
+    ]
+  });
+  console.log(response.choices[0].message.content);
+
+  // Streaming
+  const stream = await openai.chat.completions.create({
+    model: 'qwen2-0.5b',
+    messages: [{ role: 'user', content: 'Tell me a story' }],
+    stream: true
+  });
+
+  for await (const chunk of stream) {
+    const content = chunk.choices[0]?.delta?.content || '';
+    process.stdout.write(content);
+  }
+}
+
+main();
+```
+
+## Function Calling / Tools
+
+The endpoint supports OpenAI-style function calling:
+
+```bash
+curl -X POST http://localhost:11581/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "qwen2-0.5b",
+    "messages": [
+      {"role": "user", "content": "What is the weather in San Francisco?"}
+    ],
+    "tools": [
+      {
+        "type": "function",
+        "function": {
+          "name": "get_weather",
+          "description": "Get the current weather in a location",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "location": {
+                "type": "string",
+                "description": "City name"
+              },
+              "unit": {
+                "type": "string",
+                "enum": ["celsius", "fahrenheit"]
+              }
+            },
+            "required": ["location"]
+          }
+        }
+      }
+    ],
+    "tool_choice": "auto"
+  }'
+```
+
+### Response with Tool Call
+
+```json
+{
+  "id": "chatcmpl-abc123",
+  "choices": [
+    {
+      "message": {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "call_abc123",
+            "type": "function",
+            "function": {
+              "name": "get_weather",
+              "arguments": "{\"location\":\"San Francisco\",\"unit\":\"fahrenheit\"}"
+            }
+          }
+        ]
+      },
+      "finish_reason": "tool_calls"
+    }
+  ]
+}
+```
+
+## Error Handling
+
+### Model Not Found
+
+```json
+{
+  "error": "No running instance found for model: unknown-model",
+  "code": "404"
+}
+```
+
+### Model Not Ready
+
+```json
+{
+  "error": "Model instance is not running (state: starting)",
+  "code": "503"
+}
+```
+
+### Invalid Messages Format
+
+```json
+{
+  "error": "Invalid request body: messages must be an array",
+  "code": "400"
+}
+```
+
+### Rate Limit Exceeded
+
+```json
+{
+  "error": "Service temporarily unavailable (concurrency limit reached)",
+  "code": "503"
+}
+```
+
+## Advanced Features
+
+### Multi-Modal (Vision)
+
+For models that support vision:
+
+```bash
+curl -X POST http://localhost:11581/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "qwen2-vl",
+    "messages": [
+      {
+        "role": "user",
+        "content": [
+          {"type": "text", "text": "What is in this image?"},
+          {
+            "type": "image_url",
+            "image_url": {"url": "data:image/jpeg;base64,..."}
+          }
+        ]
+      }
+    ]
+  }'
+```
+
+### System Fingerprint
+
+Responses may include a `system_fingerprint` field for backend versioning:
+
+```json
+{
+  "system_fingerprint": "vllm-0.3.0-qwen2-0.5b"
+}
+```
+
+## Performance Tips
+
+### Reduce Latency
+
+- Use streaming mode for better perceived performance
+- Set lower `max_tokens` for faster responses
+- Adjust `temperature` to 0 for deterministic, faster generation
+
+### Optimize Throughput
+
+- Batch multiple requests when possible
+- Monitor instance concurrency limits
+- Use appropriate hardware (GPUs/NPUs) for your workload
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card title="Text Completions" icon="file-lines" href="/api/openai/completions">
+    Simple text completion without chat format
+  </Card>
+  <Card title="Runtime Management" icon="server" href="/api/endpoints/runtime">
+    Start and manage model instances
+  </Card>
+</CardGroup>

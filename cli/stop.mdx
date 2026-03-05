@@ -1,0 +1,195 @@
+---
+title: xw stop
+description: Stop and remove a running model instance
+---
+
+## Usage
+
+```bash
+xw stop ALIAS [flags]
+```
+
+## Description
+
+Stop and remove a running model instance by its alias. Stopping an instance will:
+
+- Stop the backend process or container
+- Remove the container and free resources
+- Permanently delete the instance
+
+The instance will need to be started again with `xw start` or `xw run` if you want to use the model again.
+
+## Arguments
+
+<ParamField path="ALIAS" type="string" required>
+  Alias of the instance to stop (found using `xw ps`)
+</ParamField>
+
+## Options
+
+<ParamField path="-f, --force" type="boolean" default="false">
+  Force stop even if instance is currently processing requests
+</ParamField>
+
+<ParamField path="-v, --verbose" type="boolean" default="false">
+  Enable verbose logging
+</ParamField>
+
+## Examples
+
+### Stop an instance
+
+```bash
+xw stop my-model
+```
+
+Gracefully stops and removes the instance named `my-model`.
+
+### Force stop an instance
+
+```bash
+xw stop test --force
+```
+
+Forcefully stops the instance even if it's processing requests.
+
+### Stop with verbose output
+
+```bash
+xw stop production -v
+```
+
+Shows detailed information about the stop process.
+
+## Output
+
+### Successful stop
+
+```
+Stopped and removed instance: my-model
+```
+
+### Instance not found
+
+```
+failed to stop instance: instance not found: my-model
+```
+
+Check running instances with `xw ps` to verify the alias.
+
+## Finding Instance Aliases
+
+Use `xw ps` to list all running instances and their aliases:
+
+```bash
+xw ps
+```
+
+Output:
+```
+ALIAS         MODEL                   ENGINE          LOCAL PORT   CONTAINER ID   STATE    UPTIME
+my-model      qwen2.5-7b-instruct    vllm:docker     8001         a1b2c3d4e5f6   ready    2h
+test          qwen2-0.5b             mindie:native   8002         -              ready    15m
+```
+
+Then stop the desired instance:
+
+```bash
+xw stop my-model
+```
+
+## Force Stop vs Normal Stop
+
+### Normal Stop (default)
+
+Waits for current requests to complete before stopping:
+
+```bash
+xw stop my-model
+```
+
+This is the recommended approach for production instances.
+
+### Force Stop
+
+Immediately terminates the instance without waiting:
+
+```bash
+xw stop my-model --force
+```
+
+Use this when:
+- The instance is unresponsive
+- You need to free resources immediately
+- The instance is in an error state
+
+## Resource Cleanup
+
+When you stop an instance:
+
+1. **Docker mode**: Container is stopped and removed
+2. **Native mode**: Process is terminated
+3. **GPU memory**: Released back to the system
+4. **Port**: Freed for other instances
+5. **Network**: Connections are closed
+
+## Common Workflows
+
+### Stop and restart an instance
+
+```bash
+# Stop the instance
+xw stop my-model
+
+# Start it again
+xw start qwen2.5-7b-instruct --alias my-model
+```
+
+### Stop all instances
+
+You can stop multiple instances by running the command for each:
+
+```bash
+xw ps  # List all instances
+xw stop instance1
+xw stop instance2
+xw stop instance3
+```
+
+### Stop a failed instance
+
+If an instance is in error state:
+
+```bash
+# Check the logs first
+xw logs failed-instance
+
+# Then stop and remove it
+xw stop failed-instance
+```
+
+## Error Handling
+
+If stop fails:
+
+```
+failed to stop instance: timeout waiting for container to stop
+```
+
+Try using force stop:
+
+```bash
+xw stop my-model --force
+```
+
+## Related Commands
+
+- [`xw ps`](/cli/ps) - List running instances
+- [`xw start`](/cli/start) - Start a model instance
+- [`xw logs`](/cli/logs) - View instance logs before stopping
+- [`xw run`](/cli/run) - Run a model with interactive chat
+
+## See Also
+
+- [Runtime API](/api/endpoints/runtime) - Manage instances programmatically
+- [Configuration](/configuration/overview) - Configure resource settings
