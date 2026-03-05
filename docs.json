@@ -51,6 +51,7 @@
               "cli/ps",
               "cli/stop",
               "cli/logs",
+              "cli/show",
               "cli/device",
               "cli/config",
               "cli/update",

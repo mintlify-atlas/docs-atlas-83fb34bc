@@ -1,0 +1,177 @@
+---
+title: 'xw show'
+description: 'Display detailed information about a model'
+---
+
+## Synopsis
+
+```bash
+xw show MODEL [flags]
+```
+
+Display information about a model in Ollama-compatible format. Without any flags, shows complete model information including architecture, parameters, and license. With flags, displays specific sections.
+
+Information is retrieved from the Modelfile (user-editable) if it exists, otherwise from the model specification (built-in configuration).
+
+## Arguments
+
+<ParamField path="MODEL" type="string" required>
+  Model name or identifier to show information for (e.g., `qwen2.5-7b-instruct`)
+</ParamField>
+
+## Flags
+
+<ParamField path="--modelfile" type="boolean" default="false">
+  Show only the Modelfile configuration
+</ParamField>
+
+<ParamField path="--parameters" type="boolean" default="false">
+  Show only inference parameters (temperature, top-p, etc.)
+</ParamField>
+
+<ParamField path="--template" type="boolean" default="false">
+  Show only the prompt template
+</ParamField>
+
+<ParamField path="--system" type="boolean" default="false">
+  Show only the system prompt
+</ParamField>
+
+<ParamField path="--license" type="boolean" default="false">
+  Show only the model license
+</ParamField>
+
+<ParamField path="--engines" type="boolean" default="false">
+  Show only supported inference engines by device type
+</ParamField>
+
+## Usage Examples
+
+### Show All Information
+
+Display complete model information including architecture, parameters, capabilities, and license:
+
+```bash
+xw show qwen2.5-7b-instruct
+```
+
+**Output:**
+```
+  Model
+
+    architecture        transformer
+    family              qwen2
+    parameters          7.6B
+    context length      131072
+    quantization        fp16
+
+
+  Supported Engines
+
+    ascend-910b         vllm:docker
+                        mindie:docker
+    ascend-310p         vllm:docker
+                        mindie:docker
+
+
+  Capabilities
+
+    completion
+
+
+  Parameters
+
+    temperature         0.7
+    top_p               0.9
+    max_tokens          2048
+
+
+  License
+
+    Apache License 2.0
+    ...
+```
+
+### Show Specific Sections
+
+Show only supported engines:
+
+```bash
+xw show qwen2.5-7b-instruct --engines
+```
+
+Show only inference parameters:
+
+```bash
+xw show qwen2.5-7b-instruct --parameters
+```
+
+Show only the system prompt:
+
+```bash
+xw show qwen2.5-7b-instruct --system
+```
+
+### Show Modelfile
+
+Display the Modelfile configuration (if exists):
+
+```bash
+xw show qwen2.5-7b-instruct --modelfile
+```
+
+## Output Sections
+
+When displaying all information, the command shows these sections:
+
+### Model
+
+Model metadata and specifications:
+- **architecture**: Model architecture type (e.g., transformer)
+- **family**: Model family (e.g., qwen2, llama)
+- **parameters**: Model size in billions of parameters
+- **context length**: Maximum context window size in tokens
+- **embedding length**: Embedding dimension size
+- **quantization**: Quantization format (fp16, int8, int4, etc.)
+
+### Supported Engines
+
+Lists inference engines available for each device type:
+- Device type (e.g., ascend-910b, ascend-310p)
+- Available engines (e.g., vllm:docker, mindie:docker)
+
+### Capabilities
+
+Model capabilities:
+- `completion` - Text completion
+- `vision` - Vision understanding
+- `tool_use` - Function calling
+- `coding` - Code generation
+
+### Parameters
+
+Inference parameters from Modelfile (if configured):
+- `temperature` - Sampling temperature
+- `top_p` - Nucleus sampling threshold
+- `top_k` - Top-k sampling
+- `max_tokens` - Maximum generation length
+- `repeat_penalty` - Repetition penalty
+
+### System
+
+System prompt used for the model (if configured)
+
+### License
+
+Model license information
+
+## Related Commands
+
+- [`xw ls`](/cli/ls) - List available models
+- [`xw pull`](/cli/pull) - Download a model
+- [`xw run`](/cli/run) - Run a model interactively
+
+## See Also
+
+- [Model Configuration](/configuration/models) - Configure custom models
+- [Supported Models](/guides/supported-models) - Browse all available models
