@@ -1,0 +1,144 @@
+{
+  "projectType": "cli-tool",
+  "projectName": "XW CLI",
+  "projectDescription": "Zero-configuration deployment tool for running large language models on Chinese domestic AI chips like Huawei Ascend NPUs",
+  "theme": "aspen",
+  "primaryColor": "#FF6B35",
+  "lightColor": "#FFB085",
+  "darkColor": "#D94A1A",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/architecture",
+              "concepts/runtime-engines",
+              "concepts/device-support",
+              "concepts/model-management"
+            ]
+          },
+          {
+            "group": "CLI Reference",
+            "pages": [
+              "cli/serve",
+              "cli/pull",
+              "cli/run",
+              "cli/start",
+              "cli/ls",
+              "cli/ps",
+              "cli/stop",
+              "cli/logs",
+              "cli/device",
+              "cli/config",
+              "cli/update",
+              "cli/reload",
+              "cli/version"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/overview",
+              "configuration/devices",
+              "configuration/models",
+              "configuration/runtime-params"
+            ]
+          },
+          {
+            "group": "Deployment",
+            "pages": [
+              "deployment/systemd",
+              "deployment/docker"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/supported-models",
+              "guides/multi-device",
+              "guides/custom-models",
+              "guides/troubleshooting"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "api/overview",
+              "api/authentication"
+            ]
+          },
+          {
+            "group": "Endpoints",
+            "pages": [
+              "api/endpoints/health",
+              "api/endpoints/models",
+              "api/endpoints/runtime",
+              "api/endpoints/devices",
+              "api/endpoints/config"
+            ]
+          },
+          {
+            "group": "OpenAI Compatibility",
+            "pages": [
+              "api/openai/completions",
+              "api/openai/chat"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "One-command deployment of LLMs on domestic Chinese AI chips",
+    "Support for Huawei Ascend 910B, 310P and other domestic hardware",
+    "Multiple inference engine backends (vLLM, MindIE, MLGuider, Omni-Infer)",
+    "Automatic hardware detection and engine selection",
+    "Pre-configured models including Qwen, GLM-4, MiniMax, DeepSeek",
+    "OpenAI-compatible API endpoints",
+    "Zero-configuration setup with intelligent defaults",
+    "Multi-device tensor parallelism support",
+    "Docker-based runtime isolation",
+    "Configuration versioning and updates"
+  ],
+  "publicApiSurface": [
+    "xw serve - Start the xw HTTP server",
+    "xw pull <model> - Download a model from registry",
+    "xw run <model> - Run a model interactively",
+    "xw start <model> - Start a model as a service",
+    "xw ls - List available models",
+    "xw ps - List running model instances",
+    "xw stop <instance> - Stop a running instance",
+    "xw logs <instance> - View instance logs",
+    "xw device - Show detected hardware devices",
+    "xw config - Manage configuration",
+    "xw update - Update model and device configurations",
+    "xw reload - Reload configuration without restart",
+    "xw version - Show version information",
+    "GET /health - Health check endpoint",
+    "GET /api/v1/models - List models",
+    "GET /api/v1/models/:id - Get model details",
+    "POST /api/v1/runtime/start - Start model instance",
+    "GET /api/v1/runtime/instances - List instances",
+    "DELETE /api/v1/runtime/instances/:id - Stop instance",
+    "GET /api/v1/devices - List hardware devices",
+    "GET /api/v1/config - Get configuration",
+    "POST /v1/completions - OpenAI-compatible completions",
+    "POST /v1/chat/completions - OpenAI-compatible chat"
+  ]
+}
